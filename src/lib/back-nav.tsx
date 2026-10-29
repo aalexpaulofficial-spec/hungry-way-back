@@ -1,6 +1,6 @@
 import { useLocation, useRouter } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Global Back navigation.
@@ -10,13 +10,17 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from "re
  * - Typed form values are saved per page in sessionStorage and restored on return.
  */
 type Step = { id: number; fn: () => void };
-const BackCtx = createContext<{ push: (s: Step) => void; remove: (id: number) => void; stack: React.MutableRefObject<Step[]> } | null>(null);
+type Ctx = { push: (s: Step) => void; remove: (id: number) => void; stack: React.MutableRefObject<Step[]>; inline: number; setInline: React.Dispatch<React.SetStateAction<number>> };
+const BackCtx = createContext<Ctx | null>(null);
 let nextId = 1;
 
 export function BackProvider({ children }: { children: ReactNode }) {
   const stack = useRef<Step[]>([]);
+  const [inline, setInline] = useState(0);
   const value = {
     stack,
+    inline,
+    setInline,
     push: (s: Step) => { stack.current = [...stack.current.filter((x) => x.id !== s.id), s]; },
     remove: (id: number) => { stack.current = stack.current.filter((x) => x.id !== id); },
   };
@@ -37,11 +41,22 @@ export function useBackStep(active: boolean, onBack: () => void) {
   }, [ctx, active]);
 }
 
-export function BackButton() {
+/**
+ * `inline` renders the arrow inside a page header (next to the logo);
+ * while an inline arrow is mounted the floating corner arrow hides, so there is never a duplicate or overlap.
+ */
+export function BackButton({ inline = false }: { inline?: boolean }) {
   const ctx = useContext(BackCtx);
   const router = useRouter();
   const { pathname } = useLocation();
+  const setInline = ctx?.setInline;
+  useEffect(() => {
+    if (!inline || !setInline) return;
+    setInline((n) => n + 1);
+    return () => setInline((n) => n - 1);
+  }, [inline, setInline]);
   if (pathname === "/") return null;
+  if (!inline && (ctx?.inline ?? 0) > 0) return null;
   const goBack = () => {
     const top = ctx?.stack.current[ctx.stack.current.length - 1];
     if (top) return top.fn();
@@ -49,7 +64,7 @@ export function BackButton() {
     else router.navigate({ to: "/" });
   };
   return (
-    <button type="button" onClick={goBack} aria-label="Go back" className="back-btn">
+    <button type="button" onClick={goBack} aria-label="Go back" className={inline ? "back-btn back-btn-inline" : "back-btn back-btn-float"}>
       <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
     </button>
   );

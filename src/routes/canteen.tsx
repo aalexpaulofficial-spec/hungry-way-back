@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useBackStep } from "@/lib/back-nav";
+import { BackButton, useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -224,10 +224,13 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-5 py-8">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          <div className="flex min-w-0 items-start gap-3">
+          <BackButton inline />
+          <div className="min-w-0">
             <p className="text-[10px] tracking-[0.3em] text-primary-bright">CANTEEN DASHBOARD · {canteen.code}</p>
             <h1 className="display text-3xl">{canteen.name}</h1>
             <p className="text-sm text-muted-foreground">{canteen.university_name} · <span className="capitalize">{canteen.visibility}</span></p>
+          </div>
           </div>
           <button onClick={onSignOut} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"><LogOut className="h-3.5 w-3.5" /> Log out</button>
         </header>

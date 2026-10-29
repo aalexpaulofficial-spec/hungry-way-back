@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useBackStep } from "@/lib/back-nav";
+import { BackButton, useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, LogOut, Check, X } from "lucide-react";
@@ -129,10 +129,13 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-5 py-8">
-        <header className="flex items-center justify-between">
-          <div>
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+          <BackButton inline />
+          <div className="min-w-0">
             <p className="text-[10px] tracking-[0.3em] text-primary-bright">HUNGRY ADMIN</p>
             <h1 className="display text-3xl">Canteen applications</h1>
+          </div>
           </div>
           <button onClick={onSignOut} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"><LogOut className="h-3.5 w-3.5" /> Log out</button>
         </header>

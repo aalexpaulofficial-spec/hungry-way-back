@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useServerFn } from "@tanstack/react-start";
 import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store } from "lucide-react";
-import { useBackStep } from "@/lib/back-nav";
+import { BackButton, useBackStep } from "@/lib/back-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { foodImage } from "@/lib/foodexa-images";
 import { ORDER_LABELS, ORDER_STATUSES, canAcceptOrders, type MenuItem } from "@/lib/access";
@@ -207,10 +207,13 @@ function OrderingApp() {
   return (
     <div className="min-h-screen bg-background">
       <div className="relative mx-auto min-h-screen w-full max-w-3xl pb-32">
-        <header className="sticky top-0 z-30 flex items-center justify-between bg-background/80 py-4 pl-16 pr-5 backdrop-blur-xl">
-          <div>
+        <header className="sticky top-0 z-30 flex items-center justify-between bg-background/80 gap-3 px-5 py-4 backdrop-blur-xl">
+          <div className="flex min-w-0 items-center gap-3">
+          <BackButton inline />
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Hi {profile.full_name.split(" ")[0]} 👋</p>
             <p className="display text-lg tracking-[0.2em]">HUNGRY</p>
+          </div>
           </div>
           <button onClick={() => setSwitching(true)} className="glass flex max-w-[55%] items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-primary-bright" />
