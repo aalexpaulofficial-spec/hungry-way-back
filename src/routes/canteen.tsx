@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -150,6 +151,8 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null);
+  useBackStep(tab !== "orders", () => setTab("orders"));
+  useBackStep(!!editing, () => setEditing(null));
   const [err, setErr] = useState("");
   const [orderMsg, setOrderMsg] = useState("");
   const [busyOrder, setBusyOrder] = useState<string | null>(null);

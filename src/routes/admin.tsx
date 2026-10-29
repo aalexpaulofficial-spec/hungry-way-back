@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, LogOut, Check, X } from "lucide-react";
@@ -92,6 +93,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const reject = useServerFn(rejectApplication);
   const setVis = useServerFn(setCanteenVisibility);
   const [tab, setTab] = useState<"pending" | "reviewed" | "canteens" | "refunds" | "coupons" | "payments" | "emails">("pending");
+  useBackStep(tab !== "pending", () => setTab("pending"));
   const [apps, setApps] = useState<App[]>([]);
   const [canteens, setCanteens] = useState<Canteen[]>([]);
   const [msg, setMsg] = useState("");
