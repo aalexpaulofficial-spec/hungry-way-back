@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { BackButton } from "@/lib/back-nav";
 
 const links = [
   { label: "For Students", href: "#students" },
@@ -41,7 +42,9 @@ export function Navbar() {
               : "max-w-7xl rounded-3xl border border-transparent px-2 py-3 sm:px-4",
           )}
         >
-          <a href="#top" className="group flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-3">
+          <BackButton inline />
+          <a href="#top" className="group flex min-w-0 items-center gap-2.5">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-[12px] font-black text-primary-foreground shadow-[0_0_24px_-4px_var(--primary)]">
               H
             </span>
@@ -54,6 +57,7 @@ export function Navbar() {
               HUNGRY
             </span>
           </a>
+          </div>
 
           <div className="hidden items-center gap-1 lg:flex">
             {links.map((l) => (
