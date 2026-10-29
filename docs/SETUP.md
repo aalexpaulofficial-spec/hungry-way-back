@@ -1,0 +1,100 @@
+# HUNGRY — production setup checklist
+
+Follow these steps in order. Everything marked **YOU** needs your accounts or keys.
+Keep Razorpay in **test mode** until step 7 passes completely.
+
+---
+
+## 1. Supabase project (YOU)
+
+1. Create a project at <https://supabase.com/dashboard> (region close to India, e.g. Mumbai).
+2. **Project Settings → API**: note the **Project URL**, the **publishable / anon key** and the **service_role / secret key**.
+
+## 2. Run the database SQL (YOU) — exact order
+
+Supabase dashboard → **SQL Editor → New query**. Paste each file's full contents and press **Run**. Run them once, in this order:
+
+| # | File | What it creates |
+|---|------|-----------------|
+| 1 | `database/001_hungry_core.sql` | roles, canteen applications, canteens, profiles, menu, orders, Row Level Security, signup trigger, realtime |
+| 2 | `database/002_payments_coupons_refunds.sql` | stock, order types & payment status, coupons, coupon redemptions, payments, webhook log, refunds, email log, transaction-safe order functions |
+
+Both should finish with "Success. No rows returned". If file 2 fails, do not edit it — re-check that file 1 ran first.
+
+Verify: **Table Editor** shows `canteen_applications, canteens, coupon_redemptions, coupons, email_logs, menu_items, orders, payment_events, payments, profiles, refunds, user_roles`.
+**Database → Publications → supabase_realtime** includes `menu_items, orders, canteens, refunds`.
+
+## 3. Supabase Auth settings (YOU)
+
+**Authentication → URL Configuration**
+- Site URL: your live site, e.g. `https://hungry.example.com` (or the Lovable published URL).
+- Redirect URLs: add the same URL with `/app`, plus your Lovable preview URL with `/app`.
+
+**Authentication → Providers → Email**: keep enabled. "Confirm email" ON is recommended; the welcome email is then sent on the customer's first login after confirming.
+
+Optional (recommended for deliverability): **Authentication → SMTP Settings** → host `smtp.gmail.com`, port `465`, user `hungryofficialx@gmail.com`, password = the Gmail App Password. This makes Supabase's own confirmation / reset emails come from HUNGRY too.
+
+## 4. Connect Supabase to the app (YOU)
+
+**In Lovable:** Project **Settings → General → External Supabase → Connect** and choose your project. This fills in the URL and keys.
+If any of these are still missing, add them under **Project Settings → Secrets**:
+
+| Name | Value | Secret? |
+|------|-------|---------|
+| `SUPABASE_URL` | Project URL | no |
+| `SUPABASE_PUBLISHABLE_KEY` | publishable / anon key | no |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role / secret key | **yes — server only** |
+
+The browser copies (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`) are public by design.
+
+**Other hosts:** set every name in `.env.example` in the host's environment settings. Never put the service role key, Razorpay secret, webhook secret, Gmail App Password or admin password in a `VITE_` variable or in the repository.
+
+## 5. Backend secrets (YOU) — Lovable: Project Settings → Secrets
+
+| Name | Where to get it |
+|------|-----------------|
+| `RAZORPAY_KEY_ID` | Razorpay Dashboard → Account & Settings → API Keys (test mode: `rzp_test_...`) |
+| `RAZORPAY_KEY_SECRET` | shown once when you generate the key above |
+| `RAZORPAY_WEBHOOK_SECRET` | any strong value you type when creating the webhook (step 6) — same value in both places |
+| `GMAIL_APP_PASSWORD` | Google Account for hungryofficialx@gmail.com → Security → 2-Step Verification ON → App passwords → create "HUNGRY" → 16 characters |
+| `GMAIL_USER` | optional, defaults to `hungryofficialx@gmail.com` |
+| `ADMIN_PASSWORD` | a strong password you choose for `/admin` |
+
+## 6. Razorpay webhook (YOU)
+
+Razorpay Dashboard → **Account & Settings → Webhooks → Add new webhook**
+- URL: `https://<your-published-site>/api/public/razorpay-webhook`
+- Secret: the same value as `RAZORPAY_WEBHOOK_SECRET`
+- Events: `payment.authorized`, `payment.captured`, `payment.failed`, `order.paid`, `refund.processed`, `refund.failed`
+
+Also set **Payment Capture → Automatic** (recommended). The app captures authorised payments itself if not.
+Webhooks only reach a published site — publish first, then add the webhook.
+
+## 7. Test checklist (test mode)
+
+Razorpay test cards / UPI: <https://razorpay.com/docs/payments/payments/test-card-details/> (e.g. UPI `success@razorpay` / `failure@razorpay`).
+
+- [ ] **Register** a student at `/auth` → confirm email → log in → **welcome email** arrives once (check Admin → Email log).
+- [ ] **Canteen application** at `/register-canteen` → Admin (`/admin`, email `aalexpaulofficial@gmail.com` + `ADMIN_PASSWORD`) → **Approve** → approval email with 7-character code. Try **Reject** on a second one → rejection email.
+- [ ] Canteen owner logs in at `/canteen` with the contact email + code → add menu items (one with stock `2`).
+- [ ] Student joins with the code → orders **Dine-in + Pay at counter** → order confirmation email, kitchen sees it instantly.
+- [ ] **Parcel**: online payment is not offered; the order is pay-at-counter only.
+- [ ] **Coupon**: Admin → Coupons → create `TEST10` (10%, min ₹100, 1 use). Apply below ₹100 → refused; above → discount shown; second use → refused.
+- [ ] **Razorpay success**: Dine-in + Pay online → pay with a test method → status "Paid", confirmation email (only after payment). Kitchen sees it only after payment.
+- [ ] **Razorpay failure**: pay with a failing test method → customer "payment failed" email + admin alert to hungryofficialx@gmail.com; "Pay now" retry works; "Cancel order" returns stock.
+- [ ] **Duplicate**: double-click Pay / reload during payment → still one order and one charge.
+- [ ] **Refund**: on a paid order tap "Request a refund" → customer + admin emails → Admin → Refunds → Approve → "processing" email → after Razorpay's `refund.processed` webhook, "refund completed" email and status Refunded.
+- [ ] **Owner cancel** of a paid order → automatic full refund.
+- [ ] **Stock**: the item with stock `2` shows "Only 2 left", then "Sold out" after two orders.
+
+## 8. Go live
+
+1. All of step 7 passes in test mode.
+2. Razorpay: complete KYC → generate **Live** keys → replace `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` with the live values → create a **live-mode** webhook (same URL, events and secret).
+3. Publish the site. Place one small real order and refund it.
+
+## Security notes
+
+- Prices, discounts, totals and stock are always computed in the database/server — the browser only sends item ids and quantities.
+- An order is marked paid only after the server checks the Razorpay signature **and** fetches the payment from Razorpay (amount, currency, order id). Webhooks are signature-checked and de-duplicated.
+- Order, payment, refund, coupon and email tables are read-only for customers (Row Level Security); all writes go through server code using the service role key.

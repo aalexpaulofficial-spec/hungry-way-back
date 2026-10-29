@@ -1,0 +1,119 @@
+import { useLocation, useRouter } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+
+/**
+ * Global Back navigation.
+ * - Screens inside a page (sheets, tabs, checkout) register a back step with useBackStep;
+ *   the newest active step runs first.
+ * - Otherwise the button goes to the previous page in history (or home).
+ * - Typed form values are saved per page in sessionStorage and restored on return.
+ */
+type Step = { id: number; fn: () => void };
+const BackCtx = createContext<{ push: (s: Step) => void; remove: (id: number) => void; stack: React.MutableRefObject<Step[]> } | null>(null);
+let nextId = 1;
+
+export function BackProvider({ children }: { children: ReactNode }) {
+  const stack = useRef<Step[]>([]);
+  const value = {
+    stack,
+    push: (s: Step) => { stack.current = [...stack.current.filter((x) => x.id !== s.id), s]; },
+    remove: (id: number) => { stack.current = stack.current.filter((x) => x.id !== id); },
+  };
+  return <BackCtx.Provider value={value}>{children}<FormDraftKeeper /></BackCtx.Provider>;
+}
+
+export function useBackStep(active: boolean, onBack: () => void) {
+  const ctx = useContext(BackCtx);
+  const fnRef = useRef(onBack);
+  fnRef.current = onBack;
+  const idRef = useRef(0);
+  if (!idRef.current) idRef.current = nextId++;
+  useEffect(() => {
+    if (!ctx || !active) return;
+    const id = idRef.current;
+    ctx.push({ id, fn: () => fnRef.current() });
+    return () => ctx.remove(id);
+  }, [ctx, active]);
+}
+
+export function BackButton() {
+  const ctx = useContext(BackCtx);
+  const router = useRouter();
+  const { pathname } = useLocation();
+  if (pathname === "/") return null;
+  const goBack = () => {
+    const top = ctx?.stack.current[ctx.stack.current.length - 1];
+    if (top) return top.fn();
+    if (typeof window !== "undefined" && window.history.length > 1) router.history.back();
+    else router.navigate({ to: "/" });
+  };
+  return (
+    <button type="button" onClick={goBack} aria-label="Go back" className="back-btn">
+      <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+    </button>
+  );
+}
+
+const DRAFT_KEY = "hungry-form-drafts";
+type Field = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+const SKIP = new Set(["password", "file", "hidden", "submit", "button", "checkbox", "radio"]);
+
+function fieldKey(el: Field) {
+  const name = el.getAttribute("name") || el.id || el.getAttribute("placeholder") || el.getAttribute("aria-label");
+  return name ? `${window.location.pathname}${window.location.search}::${name}` : null;
+}
+function readDrafts(): Record<string, string> {
+  try { return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "{}"); } catch { return {}; }
+}
+
+function FormDraftKeeper() {
+  const { pathname, searchStr } = useLocation();
+  useEffect(() => {
+    const onInput = (e: Event) => {
+      const el = e.target as Field;
+      if (!el || !("value" in el) || SKIP.has((el as HTMLInputElement).type)) return;
+      const k = fieldKey(el);
+      if (!k) return;
+      const d = readDrafts();
+      d[k] = el.value;
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    };
+    document.addEventListener("input", onInput, true);
+    document.addEventListener("change", onInput, true);
+    return () => { document.removeEventListener("input", onInput, true); document.removeEventListener("change", onInput, true); };
+  }, []);
+  // Restore saved values on the page we land on (also covers late-rendered fields).
+  useEffect(() => {
+    const restore = () => {
+      const d = readDrafts();
+      document.querySelectorAll<Field>("input, textarea, select").forEach((el) => {
+        if (SKIP.has((el as HTMLInputElement).type) || el.value || el.dataset["draftRestored"]) return;
+        const k = fieldKey(el);
+        if (!k || d[k] == null || d[k] === "") return;
+        const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, d[k]);
+        el.dataset["draftRestored"] = "1";
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    };
+    restore();
+    const obs = new MutationObserver(restore);
+    obs.observe(document.body, { childList: true, subtree: true });
+    const t = setTimeout(() => obs.disconnect(), 5000);
+    return () => { obs.disconnect(); clearTimeout(t); };
+  }, [pathname, searchStr]);
+  // Drafts are cleared after a successful submit so finished forms don't refill.
+  useEffect(() => {
+    const onSubmit = () => setTimeout(() => {
+      const d = readDrafts();
+      const prefix = `${window.location.pathname}${window.location.search}::`;
+      Object.keys(d).forEach((k) => k.startsWith(prefix) && delete d[k]);
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    }, 1500);
+    document.addEventListener("submit", onSubmit, true);
+    return () => document.removeEventListener("submit", onSubmit, true);
+  }, []);
+  return null;
+}
