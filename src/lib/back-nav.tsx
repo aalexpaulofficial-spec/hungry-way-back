@@ -88,12 +88,12 @@ function FormDraftKeeper() {
     const restore = () => {
       const d = readDrafts();
       document.querySelectorAll<Field>("input, textarea, select").forEach((el) => {
-        if (SKIP.has((el as HTMLInputElement).type) || el.value || el.dataset.draftRestored) return;
+        if (SKIP.has((el as HTMLInputElement).type) || el.value || el.dataset["draftRestored"]) return;
         const k = fieldKey(el);
         if (!k || d[k] == null || d[k] === "") return;
         const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
         Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, d[k]);
-        el.dataset.draftRestored = "1";
+        el.dataset["draftRestored"] = "1";
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
       });
