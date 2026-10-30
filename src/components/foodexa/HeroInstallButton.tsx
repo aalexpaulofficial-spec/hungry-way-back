@@ -37,9 +37,9 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     <a
       href={`/install/${app}`}
       aria-label={installed ? "Already Installed" : label.ariaLabel}
-      className="group inline-flex min-w-0 shrink items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-primary/60 bg-background px-4 py-3.5 text-[13px] font-semibold text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:px-6 sm:text-sm"
+      className="group inline-flex min-w-0 max-w-full shrink items-center justify-center gap-1.5 whitespace-normal rounded-full border border-primary/60 bg-background px-4 py-3.5 text-center text-[13px] font-semibold leading-tight text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:whitespace-nowrap sm:px-6 sm:text-sm"
     >
-      <span className="relative inline-grid overflow-hidden">
+      <span className="relative inline-grid min-w-0 max-w-full overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
             key={installed ? "installed" : showAudience ? "audience" : "download"}

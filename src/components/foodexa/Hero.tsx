@@ -123,17 +123,19 @@ export function Hero() {
           </p>
 
           <div data-sub className="mt-9 flex flex-wrap items-center gap-3">
-            <a
-              href="/auth"
-              className="group inline-flex min-w-0 shrink items-center justify-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 py-3.5 text-[13px] font-semibold sm:px-6 sm:text-sm text-primary-foreground transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_0_44px_-6px_var(--primary-bright)]"
-            >
-              Start with HUNGRY
-              <span className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1">
-                ↗
-              </span>
-            </a>
-            <HeroInstallButton app="student" />
-            <HeroInstallButton app="canteen" />
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
+              <a
+                href="/auth"
+                className="group inline-flex min-w-0 shrink items-center justify-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 py-3.5 text-[13px] font-semibold sm:px-6 sm:text-sm text-primary-foreground transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_0_44px_-6px_var(--primary-bright)]"
+              >
+                Start with HUNGRY
+                <span className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1">
+                  ↗
+                </span>
+              </a>
+              <HeroInstallButton app="student" />
+              <HeroInstallButton app="canteen" />
+            </div>
             <a
               href="#students"
               className="group inline-flex items-center gap-2 rounded-full border border-border px-6 py-3.5 text-sm font-medium text-foreground/80 transition-colors duration-300 hover:border-primary/50 hover:text-foreground"
