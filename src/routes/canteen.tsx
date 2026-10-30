@@ -131,7 +131,7 @@ function CanteenPage() {
 }
 
 type Order = { id: string; order_number: string; customer_name: string; lines: { name: string; qty: number }[]; total: number; discount: number; pickup_code: string; status: string; created_at: string; order_type: string; payment_method: string; payment_status: string };
-type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; updated_at?: string };
+type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; banner_crop_x: number; banner_crop_y: number; banner_crop_zoom: number; updated_at?: string };
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
 const BANNER_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
@@ -142,13 +142,15 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null);
   const [foodImageFile, setFoodImageFile] = useState<File | null>(null);
   const [foodImagePreview, setFoodImagePreview] = useState<string | null>(null);
-  const [template, setTemplate] = useState<CanteenTemplate>({ canteen_id: canteen.id, banner_image_url: null, heading: "", description: "" });
+  const [template, setTemplate] = useState<CanteenTemplate>({ canteen_id: canteen.id, banner_image_url: null, heading: "", description: "", banner_crop_x: 50, banner_crop_y: 50, banner_crop_zoom: 1 });
   const [templateHeading, setTemplateHeading] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateImage, setTemplateImage] = useState<File | null>(null);
   const [templatePreview, setTemplatePreview] = useState<string | null>(null);
   const [templateError, setTemplateError] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [bannerCrop, setBannerCrop] = useState({ x: 50, y: 50, zoom: 1 });
+  const [bannerPreviewSize, setBannerPreviewSize] = useState<"mobile" | "tablet" | "laptop">("laptop");
   useBackStep(tab !== "menu", () => setTab("menu"));
   useBackStep(!!editing, () => setEditing(null));
   const [err, setErr] = useState("");
@@ -195,15 +197,16 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
       setOrders((data as unknown as Order[]) ?? []);
     };
     const loadTemplate = async () => {
-      const { data, error } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,updated_at").eq("canteen_id", canteen.id).maybeSingle();
+      const { data, error } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,banner_crop_x,banner_crop_y,banner_crop_zoom,updated_at").eq("canteen_id", canteen.id).maybeSingle();
       if (error) {
-        setTemplateError("Could not load the canteen template. Apply database/006_canteen_templates.sql and try again.");
+        setTemplateError("Could not load the canteen template. Apply database/007_canteen_template_crop.sql after the earlier migrations and try again.");
         return;
       }
-      const loadedTemplate = data ?? { canteen_id: canteen.id, banner_image_url: null, heading: "", description: "" };
+      const loadedTemplate = data ?? { canteen_id: canteen.id, banner_image_url: null, heading: "", description: "", banner_crop_x: 50, banner_crop_y: 50, banner_crop_zoom: 1 };
       setTemplate(loadedTemplate);
       setTemplateHeading(loadedTemplate.heading);
       setTemplateDescription(loadedTemplate.description);
+      setBannerCrop({ x: loadedTemplate.banner_crop_x, y: loadedTemplate.banner_crop_y, zoom: loadedTemplate.banner_crop_zoom });
       setTemplateError("");
     };
     loadMenu();
@@ -250,13 +253,14 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
       }
       const { data, error } = await supabase
         .from("canteen_templates")
-        .upsert({ canteen_id: canteen.id, banner_image_url: bannerImageUrl, heading, description }, { onConflict: "canteen_id" })
-        .select("canteen_id,banner_image_url,heading,description,updated_at")
+        .upsert({ canteen_id: canteen.id, banner_image_url: bannerImageUrl, heading, description, banner_crop_x: bannerCrop.x, banner_crop_y: bannerCrop.y, banner_crop_zoom: bannerCrop.zoom }, { onConflict: "canteen_id" })
+        .select("canteen_id,banner_image_url,heading,description,banner_crop_x,banner_crop_y,banner_crop_zoom,updated_at")
         .single();
       if (error || !data) throw new Error(error?.message || "Could not save the canteen template.");
       setTemplate(data);
       setTemplateHeading(data.heading);
       setTemplateDescription(data.description);
+      setBannerCrop({ x: data.banner_crop_x, y: data.banner_crop_y, zoom: data.banner_crop_zoom });
       setTemplateImage(null);
       setTab("menu");
     } catch (error) {
@@ -388,22 +392,40 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                 name="templateImage"
                 accept="image/jpeg,image/png,image/webp,image/avif"
                 aria-label="Choose canteen banner image"
-                onChange={(event) => setTemplateImage(event.currentTarget.files?.[0] ?? null)}
+                onChange={(event) => {
+                  setTemplateImage(event.currentTarget.files?.[0] ?? null);
+                  setBannerCrop({ x: 50, y: 50, zoom: 1 });
+                }}
                 className={cn(field, "file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground")}
               />
             </label>
             <input name="templateHeading" maxLength={120} value={templateHeading} onChange={(event) => setTemplateHeading(event.currentTarget.value)} placeholder="Heading (optional)" className={field} />
             <textarea name="templateDescription" maxLength={500} value={templateDescription} onChange={(event) => setTemplateDescription(event.currentTarget.value)} placeholder="Description (optional)" rows={3} className={field} />
             <div>
-              <p className="mb-2 text-xs font-semibold text-foreground">Preview</p>
-              <CanteenTemplateBanner
-                imageUrl={templatePreview ?? template.banner_image_url}
-                heading={templateHeading}
-                description={templateDescription}
-                canteenName={canteen.name}
-                universityName={canteen.university_name}
-                preview
-              />
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-foreground">Preview · drag image to reposition</p>
+                <div className="flex gap-1" aria-label="Banner preview size">
+                  {(["mobile", "tablet", "laptop"] as const).map((size) => <button key={size} type="button" onClick={() => setBannerPreviewSize(size)} aria-pressed={bannerPreviewSize === size} className={cn("rounded-full border px-3 py-1 text-[10px] capitalize", bannerPreviewSize === size ? "border-primary bg-primary/15 text-primary-bright" : "border-border text-muted-foreground")}>{size}</button>)}
+                </div>
+              </div>
+              <div className="mx-auto w-full transition-[max-width]" style={{ maxWidth: bannerPreviewSize === "mobile" ? 360 : bannerPreviewSize === "tablet" ? 640 : 900 }}>
+                <CanteenTemplateBanner
+                  imageUrl={templatePreview ?? template.banner_image_url}
+                  heading={templateHeading}
+                  description={templateDescription}
+                  canteenName={canteen.name}
+                  universityName={canteen.university_name}
+                  cropX={bannerCrop.x}
+                  cropY={bannerCrop.y}
+                  cropZoom={bannerCrop.zoom}
+                  onCropChange={({ x, y }) => setBannerCrop((crop) => ({ ...crop, x, y }))}
+                  preview
+                />
+              </div>
+              <label className="mt-3 block space-y-1.5 text-xs text-muted-foreground">
+                <span className="flex justify-between"><span>Zoom</span><span>{bannerCrop.zoom.toFixed(2)}×</span></span>
+                <input type="range" min="1" max="3" step="0.05" value={bannerCrop.zoom} onChange={(event) => setBannerCrop((crop) => ({ ...crop, zoom: Number(event.currentTarget.value) }))} aria-label="Banner image zoom" className="w-full accent-primary" />
+              </label>
             </div>
             {templateError && <p role="alert" className="text-sm text-primary-bright">{templateError}</p>}
             <div className="flex gap-2">

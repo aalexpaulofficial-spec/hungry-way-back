@@ -118,6 +118,9 @@ export type Database = {
       canteen_templates: {
         Row: {
           banner_image_url: string | null
+          banner_crop_x: number
+          banner_crop_y: number
+          banner_crop_zoom: number
           canteen_id: string
           description: string
           heading: string
@@ -126,6 +129,9 @@ export type Database = {
         }
         Insert: {
           banner_image_url?: string | null
+          banner_crop_x?: number
+          banner_crop_y?: number
+          banner_crop_zoom?: number
           canteen_id: string
           description?: string
           heading?: string
@@ -134,6 +140,9 @@ export type Database = {
         }
         Update: {
           banner_image_url?: string | null
+          banner_crop_x?: number
+          banner_crop_y?: number
+          banner_crop_zoom?: number
           canteen_id?: string
           description?: string
           heading?: string

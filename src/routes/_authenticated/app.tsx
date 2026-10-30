@@ -54,7 +54,7 @@ export const Route = createFileRoute("/_authenticated/app")({
 
 type Profile = { id: string; full_name: string; role: string; registration_number: string | null; email: string; current_canteen_id: string | null; welcome_email_sent_at: string | null };
 type Canteen = { id: string; name: string; university_name: string; campus_location: string; visibility: string; is_active: boolean };
-type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; updated_at?: string };
+type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; banner_crop_x: number; banner_crop_y: number; banner_crop_zoom: number; updated_at?: string };
 type CartLine = { item: MenuItem; qty: number };
 type Order = {
   id: string; user_id: string; order_number: string; pickup_code: string; lines: { name: string; qty: number; price: number }[];
@@ -134,7 +134,7 @@ function OrderingApp() {
       if (alive) setMenu((data as MenuItem[]) ?? []);
     };
     const loadTemplate = async () => {
-      const { data } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,updated_at").eq("canteen_id", canteenId).maybeSingle();
+      const { data } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,banner_crop_x,banner_crop_y,banner_crop_zoom,updated_at").eq("canteen_id", canteenId).maybeSingle();
       if (alive) setCanteenTemplate(data);
     };
     loadMenu();
@@ -494,13 +494,13 @@ function FoodCard({ item, onOpen, onAdd, wide }: { item: MenuItem; onOpen: (i: M
 }
 
 function HomeTab({ menu, canteen, template, onOpen, onAdd, goMenu }: { menu: MenuItem[]; canteen: Canteen; template: CanteenTemplate | null; onOpen: (i: MenuItem) => void; onAdd: (i: MenuItem) => void; goMenu: () => void }) {
-  if (!menu.length) return <div className="space-y-8 pt-2"><CanteenTemplateBanner imageUrl={template?.banner_image_url} heading={template?.heading} description={template?.description} canteenName={canteen.name} universityName={canteen.university_name} onOrder={goMenu} /><Empty title="Your canteen is getting ready" text={`${canteen.name} hasn't published its menu yet. It will appear here live as soon as it does.`} /></div>;
+  if (!menu.length) return <div className="space-y-8 pt-2"><CanteenTemplateBanner imageUrl={template?.banner_image_url} heading={template?.heading} description={template?.description} canteenName={canteen.name} universityName={canteen.university_name} cropX={template?.banner_crop_x} cropY={template?.banner_crop_y} cropZoom={template?.banner_crop_zoom} onOrder={goMenu} /><Empty title="Your canteen is getting ready" text={`${canteen.name} hasn't published its menu yet. It will appear here live as soon as it does.`} /></div>;
   const featured = menu.filter((m) => m.tag);
   const quick = menu.filter((m) => m.prep_minutes <= 8);
   return (
     <div className="space-y-8 pt-2">
       <div className="relative overflow-hidden rounded-[2rem] border border-primary/30">
-        <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" />
+        <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={{ objectPosition: `${template?.banner_crop_x ?? 50}% ${template?.banner_crop_y ?? 50}%`, transform: `scale(${template?.banner_crop_zoom ?? 1})` }} />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-5 left-5 right-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
