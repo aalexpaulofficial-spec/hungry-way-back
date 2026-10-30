@@ -377,7 +377,7 @@ function Screen({ screen }: { screen: ScreenKey }) {
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-[8px] tracking-[0.22em] text-muted-foreground">SCAN AT COUNTER</p>
         <QrBlock />
-        <p className="display text-[13px]">#FX-2471</p>
+        <p className="display text-[13px]">#HG-2471</p>
         <p className="text-[8.5px] text-muted-foreground">
           Show this code at Block A Canteen.
           <br />
