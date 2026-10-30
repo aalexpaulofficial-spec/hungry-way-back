@@ -254,8 +254,8 @@ function OrderingApp() {
           <div className="flex min-w-0 items-center gap-3">
           <BackButton inline />
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Hi {profile.full_name.split(" ")[0]} 👋</p>
-            <p className="display text-lg tracking-[0.2em]">HUNGRY</p>
+            <p className="text-xs text-muted-foreground">Hi, {profile.full_name} 👋</p>
+            <p className="display text-lg tracking-[0.2em]">HUNGRY?</p>
           </div>
           </div>
           <button onClick={() => setSwitching(true)} className="glass flex max-w-[55%] items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold">
