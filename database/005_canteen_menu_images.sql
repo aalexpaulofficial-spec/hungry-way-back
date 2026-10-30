@@ -27,7 +27,7 @@ WITH CHECK (
   AND EXISTS (
     SELECT 1
     FROM public.canteens c
-    WHERE c.id::text = (storage.foldername(name))[1]
+    WHERE c.id::text = (storage.foldername(storage.objects.name))[1]
       AND public.owns_canteen(c.id)
   )
 );
@@ -40,7 +40,7 @@ USING (
   AND EXISTS (
     SELECT 1
     FROM public.canteens c
-    WHERE c.id::text = (storage.foldername(name))[1]
+    WHERE c.id::text = (storage.foldername(storage.objects.name))[1]
       AND public.owns_canteen(c.id)
   )
 );

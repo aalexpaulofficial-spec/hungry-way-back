@@ -180,6 +180,78 @@ export const getCanteenOwnerAccess = createServerFn({ method: "POST" })
     return { status, linked: canAccessOwnerCanteen(canteen.is_active, status) };
   });
 
+const MENU_IMAGE_BUCKET = "canteen-menu-images";
+const MENU_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"] as const;
+const MENU_IMAGE_BUCKET_OPTIONS = {
+  public: true,
+  fileSizeLimit: 8 * 1024 * 1024,
+  allowedMimeTypes: [...MENU_IMAGE_TYPES],
+};
+
+/** Creates a short-lived, one-path upload token only after verifying the approved canteen owner. */
+export const createCanteenMenuImageUpload = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    canteenId: z.string().uuid(),
+    contentType: z.enum(MENU_IMAGE_TYPES),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const db = await admin();
+    const { data: canteen, error: canteenError } = await db
+      .from("canteens")
+      .select("id,application_id,is_active")
+      .eq("id", data.canteenId)
+      .eq("owner_user_id", context.userId)
+      .maybeSingle();
+    if (canteenError) throw new Error("Could not verify canteen image upload access.");
+    if (!canteen?.is_active || !canteen.application_id) throw new Error("Only the approved canteen owner can upload menu images.");
+
+    const { data: application, error: applicationError } = await db
+      .from("canteen_applications")
+      .select("status")
+      .eq("id", canteen.application_id)
+      .maybeSingle();
+    if (applicationError) throw new Error("Could not verify canteen approval for image upload.");
+    if (!canAccessOwnerCanteen(canteen.is_active, (application?.status ?? "missing") as CanteenApplicationStatus)) {
+      throw new Error("Only the approved canteen owner can upload menu images.");
+    }
+
+    const extensionByType: Record<(typeof MENU_IMAGE_TYPES)[number], string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/avif": "avif",
+    };
+    const path = `${canteen.id}/${crypto.randomUUID()}.${extensionByType[data.contentType]}`;
+    const storage = db.storage.from(MENU_IMAGE_BUCKET);
+    const { data: bucket, error: bucketError } = await db.storage.getBucket(MENU_IMAGE_BUCKET);
+    const bucketMissing = bucketError && (bucketError.statusCode === "404" || /bucket not found/i.test(bucketError.message));
+    if (bucketError && !bucketMissing) throw new Error("Could not check the food image storage bucket.");
+
+    if (!bucket) {
+      const { error: createError } = await db.storage.createBucket(MENU_IMAGE_BUCKET, MENU_IMAGE_BUCKET_OPTIONS);
+      if (createError && !/already exists|duplicate/i.test(createError.message)) {
+        throw new Error("Food image storage is not ready. Please contact support.");
+      }
+    } else if (
+      !bucket.public ||
+      bucket.file_size_limit !== MENU_IMAGE_BUCKET_OPTIONS.fileSizeLimit ||
+      MENU_IMAGE_TYPES.some((type) => !bucket.allowed_mime_types?.includes(type)) ||
+      bucket.allowed_mime_types?.length !== MENU_IMAGE_TYPES.length
+    ) {
+      const { error: updateError } = await db.storage.updateBucket(MENU_IMAGE_BUCKET, MENU_IMAGE_BUCKET_OPTIONS);
+      if (updateError) throw new Error("Could not configure secure food image storage.");
+    }
+
+    const { data: signed, error: signedError } = await storage.createSignedUploadUrl(path);
+    if (signedError || !signed) throw new Error("Could not prepare the food image upload. Please try again.");
+    return {
+      path,
+      token: signed.token,
+      publicUrl: storage.getPublicUrl(path).data.publicUrl,
+    };
+  });
+
 /* ---------------- Public: admin login (server-verified) ---------------- */
 export const adminLogin = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>

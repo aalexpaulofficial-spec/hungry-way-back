@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { LogOut, Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getCanteenOwnerAccess, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
+import { createCanteenMenuImageUpload, getCanteenOwnerAccess, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
 import { ORDER_TYPE_LABELS, PAYMENT_STATUS_LABELS, type OrderType } from "@/lib/order-rules";
 import { ORDER_LABELS, type MenuItem } from "@/lib/access";
 import { foodImage } from "@/lib/foodexa-images";
@@ -144,6 +144,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
   const [err, setErr] = useState("");
   const [orderMsg, setOrderMsg] = useState("");
   const [busyOrder, setBusyOrder] = useState<string | null>(null);
+  const prepareMenuImageUpload = useServerFn(createCanteenMenuImageUpload);
   const move = useServerFn(ownerUpdateOrderStatus);
 
   useEffect(() => () => {
@@ -217,15 +218,20 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         const extension = mimeToExtension[foodImageFile.type];
         if (!extension) return setErr("Choose a JPG, PNG, WEBP, or AVIF food image.");
         if (foodImageFile.size > 8 * 1024 * 1024) return setErr("Food images must be 8 MB or smaller.");
-        uploadedPath = `${canteen.id}/${crypto.randomUUID()}.${extension}`;
+        const uploadTarget = await prepareMenuImageUpload({
+          data: {
+            canteenId: canteen.id,
+            contentType: foodImageFile.type as "image/jpeg" | "image/png" | "image/webp" | "image/avif",
+          },
+        });
+        uploadedPath = uploadTarget.path;
         const storage = supabase.storage.from("canteen-menu-images");
-        const { error: uploadError } = await storage.upload(uploadedPath, foodImageFile, {
+        const { error: uploadError } = await storage.uploadToSignedUrl(uploadedPath, uploadTarget.token, foodImageFile, {
           cacheControl: "3600",
           contentType: foodImageFile.type,
-          upsert: false,
         });
         if (uploadError) throw new Error(`Could not upload the food image: ${uploadError.message}`);
-        row.image = storage.getPublicUrl(uploadedPath).data.publicUrl;
+        row.image = uploadTarget.publicUrl;
       }
       const result = editing?.id
         ? await supabase.from("menu_items").update(row).eq("id", editing.id).select().single()
