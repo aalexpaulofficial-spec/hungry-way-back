@@ -115,6 +115,41 @@ export type Database = {
         }
         Relationships: []
       }
+      canteen_templates: {
+        Row: {
+          banner_image_url: string | null
+          canteen_id: string
+          description: string
+          heading: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          banner_image_url?: string | null
+          canteen_id: string
+          description?: string
+          heading?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          banner_image_url?: string | null
+          canteen_id?: string
+          description?: string
+          heading?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canteen_templates_canteen_id_fkey"
+            columns: ["canteen_id"]
+            isOneToOne: true
+            referencedRelation: "canteens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       canteens: {
         Row: {
           application_id: string | null

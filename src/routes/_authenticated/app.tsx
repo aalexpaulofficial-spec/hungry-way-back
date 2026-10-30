@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useServerFn } from "@tanstack/react-start";
 import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store } from "lucide-react";
 import { LogoMark } from "@/components/foodexa/LogoMark";
+import { CanteenTemplateBanner } from "@/components/foodexa/CanteenTemplateBanner";
 import { BackButton, useBackStep } from "@/lib/back-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { foodImage } from "@/lib/foodexa-images";
@@ -53,6 +54,7 @@ export const Route = createFileRoute("/_authenticated/app")({
 
 type Profile = { id: string; full_name: string; role: string; registration_number: string | null; email: string; current_canteen_id: string | null; welcome_email_sent_at: string | null };
 type Canteen = { id: string; name: string; university_name: string; campus_location: string; visibility: string; is_active: boolean };
+type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; updated_at?: string };
 type CartLine = { item: MenuItem; qty: number };
 type Order = {
   id: string; user_id: string; order_number: string; pickup_code: string; lines: { name: string; qty: number; price: number }[];
@@ -68,6 +70,7 @@ function OrderingApp() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [canteen, setCanteen] = useState<Canteen | null>(null);
+  const [canteenTemplate, setCanteenTemplate] = useState<CanteenTemplate | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [collectedOrder, setCollectedOrder] = useState<Order | null>(null);
@@ -130,11 +133,17 @@ function OrderingApp() {
       const { data } = await supabase.from("menu_items").select("*").eq("canteen_id", canteenId).order("category").order("name");
       if (alive) setMenu((data as MenuItem[]) ?? []);
     };
+    const loadTemplate = async () => {
+      const { data } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,updated_at").eq("canteen_id", canteenId).maybeSingle();
+      if (alive) setCanteenTemplate(data);
+    };
     loadMenu();
+    loadTemplate();
     setCart([]);
     const ch = supabase
       .channel(`menu-${canteenId}-${uid()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items", filter: `canteen_id=eq.${canteenId}` }, loadMenu)
+      .on("postgres_changes", { event: "*", schema: "public", table: "canteen_templates", filter: `canteen_id=eq.${canteenId}` }, loadTemplate)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "canteens", filter: `id=eq.${canteenId}` }, (p) => setCanteen((c) => (c ? { ...c, ...(p.new as Canteen) } : c)))
       .subscribe();
     return () => {
@@ -262,7 +271,7 @@ function OrderingApp() {
 
         <AnimatePresence mode="wait">
           <motion.main key={tab} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.25 }} className="px-5">
-            {tab === "home" && <HomeTab menu={liveMenu} canteen={canteen} onOpen={setDetail} onAdd={add} goMenu={() => setTab("menu")} />}
+            {tab === "home" && <HomeTab menu={liveMenu} canteen={canteen} template={canteenTemplate} onOpen={setDetail} onAdd={add} goMenu={() => setTab("menu")} />}
             {tab === "menu" && <MenuTab menu={liveMenu} onOpen={setDetail} onAdd={add} />}
             {tab === "orders" && <OrdersTab orders={orders} onOpen={(o) => setOpenOrderId(o.id)} />}
             {tab === "you" && <YouTab profile={profile} canteen={canteen} onSwitch={() => setSwitching(true)} onSignOut={signOut} />}
@@ -484,18 +493,19 @@ function FoodCard({ item, onOpen, onAdd, wide }: { item: MenuItem; onOpen: (i: M
   );
 }
 
-function HomeTab({ menu, canteen, onOpen, onAdd, goMenu }: { menu: MenuItem[]; canteen: Canteen; onOpen: (i: MenuItem) => void; onAdd: (i: MenuItem) => void; goMenu: () => void }) {
-  if (!menu.length) return <Empty title="Your canteen is getting ready" text={`${canteen.name} hasn't published its menu yet. It will appear here live as soon as it does.`} />;
+function HomeTab({ menu, canteen, template, onOpen, onAdd, goMenu }: { menu: MenuItem[]; canteen: Canteen; template: CanteenTemplate | null; onOpen: (i: MenuItem) => void; onAdd: (i: MenuItem) => void; goMenu: () => void }) {
+  if (!menu.length) return <div className="space-y-8 pt-2"><CanteenTemplateBanner imageUrl={template?.banner_image_url} heading={template?.heading} description={template?.description} canteenName={canteen.name} universityName={canteen.university_name} onOrder={goMenu} /><Empty title="Your canteen is getting ready" text={`${canteen.name} hasn't published its menu yet. It will appear here live as soon as it does.`} /></div>;
   const featured = menu.filter((m) => m.tag);
   const quick = menu.filter((m) => m.prep_minutes <= 8);
   return (
     <div className="space-y-8 pt-2">
       <div className="relative overflow-hidden rounded-[2rem] border border-primary/30">
-        <img src={foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" />
+        <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-5 left-5 right-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
-          <p className="display mt-1 text-3xl">Skip the queue.</p>
+          <p className="display mt-1 text-3xl">{template?.heading?.trim() || "Skip the queue."}</p>
+          {template?.description?.trim() && <p className="mt-2 max-w-xl text-sm text-foreground/90">{template.description.trim()}</p>}
           <button onClick={goMenu} className="mt-3 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground">Order now ↗</button>
         </div>
       </div>
@@ -843,7 +853,7 @@ function CollectionCelebration({ onContinue }: { onContinue: () => void }) {
       >
         <div aria-hidden="true" className="ember pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 opacity-60" />
         <div className="relative mx-auto">
-          <LogoMark className="h-16 w-16 text-2xl" />
+          <LogoMark className="h-16 w-16 text-2xl animate-none transition-none transform-none" />
         </div>
         <p className="relative mt-6 text-[10px] font-bold tracking-[0.32em] text-primary-bright">ORDER COLLECTED</p>
         <h2 id="collection-celebration-title" className="display relative mt-3 text-2xl leading-tight sm:text-3xl">THANK YOU FOR USING HUNGRY!</h2>

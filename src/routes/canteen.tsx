@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { LogOut, Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { CanteenTemplateBanner } from "@/components/foodexa/CanteenTemplateBanner";
 import { createCanteenMenuImageUpload, getCanteenOwnerAccess, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
 import { ORDER_TYPE_LABELS, PAYMENT_STATUS_LABELS, type OrderType } from "@/lib/order-rules";
 import { ORDER_LABELS, type MenuItem } from "@/lib/access";
@@ -130,15 +131,24 @@ function CanteenPage() {
 }
 
 type Order = { id: string; order_number: string; customer_name: string; lines: { name: string; qty: number }[]; total: number; discount: number; pickup_code: string; status: string; created_at: string; order_type: string; payment_method: string; payment_status: string };
+type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; updated_at?: string };
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
+const BANNER_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
-  const [tab, setTab] = useState<"orders" | "menu">("menu");
+  const [tab, setTab] = useState<"menu" | "orders" | "template">("menu");
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null);
   const [foodImageFile, setFoodImageFile] = useState<File | null>(null);
   const [foodImagePreview, setFoodImagePreview] = useState<string | null>(null);
+  const [template, setTemplate] = useState<CanteenTemplate>({ canteen_id: canteen.id, banner_image_url: null, heading: "", description: "" });
+  const [templateHeading, setTemplateHeading] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateImage, setTemplateImage] = useState<File | null>(null);
+  const [templatePreview, setTemplatePreview] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
   useBackStep(tab !== "menu", () => setTab("menu"));
   useBackStep(!!editing, () => setEditing(null));
   const [err, setErr] = useState("");
@@ -150,6 +160,16 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
   useEffect(() => () => {
     if (foodImagePreview) URL.revokeObjectURL(foodImagePreview);
   }, [foodImagePreview]);
+
+  useEffect(() => {
+    if (!templateImage) {
+      setTemplatePreview(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(templateImage);
+    setTemplatePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [templateImage]);
 
   async function setStatus(o: Order, status: "preparing" | "ready" | "collected" | "cancelled") {
     if (status === "cancelled" && !window.confirm(o.payment_status === "paid" ? `Cancel ${o.order_number}? The customer will be refunded ₹${o.total} automatically.` : `Cancel ${o.order_number}?`)) return;
@@ -174,17 +194,78 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
       const { data } = await supabase.from("orders").select("*").eq("canteen_id", canteen.id).order("created_at", { ascending: false }).limit(100);
       setOrders((data as unknown as Order[]) ?? []);
     };
+    const loadTemplate = async () => {
+      const { data, error } = await supabase.from("canteen_templates").select("canteen_id,banner_image_url,heading,description,updated_at").eq("canteen_id", canteen.id).maybeSingle();
+      if (error) {
+        setTemplateError("Could not load the canteen template. Apply database/006_canteen_templates.sql and try again.");
+        return;
+      }
+      const loadedTemplate = data ?? { canteen_id: canteen.id, banner_image_url: null, heading: "", description: "" };
+      setTemplate(loadedTemplate);
+      setTemplateHeading(loadedTemplate.heading);
+      setTemplateDescription(loadedTemplate.description);
+      setTemplateError("");
+    };
     loadMenu();
     loadOrders();
+    loadTemplate();
     const ch = supabase
       .channel(`canteen-${canteen.id}-${uid()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items", filter: `canteen_id=eq.${canteen.id}` }, loadMenu)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `canteen_id=eq.${canteen.id}` }, loadOrders)
+      .on("postgres_changes", { event: "*", schema: "public", table: "canteen_templates", filter: `canteen_id=eq.${canteen.id}` }, loadTemplate)
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
     };
   }, [canteen.id]);
+
+  async function saveTemplate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setTemplateError("");
+    const heading = templateHeading.trim();
+    const description = templateDescription.trim();
+    if (heading.length > 120) return setTemplateError("Keep the heading under 120 characters.");
+    if (description.length > 500) return setTemplateError("Keep the description under 500 characters.");
+
+    setSavingTemplate(true);
+    let uploadedPath: string | null = null;
+    try {
+      let bannerImageUrl = template.banner_image_url;
+      if (templateImage) {
+        const extension = BANNER_IMAGE_TYPES[templateImage.type];
+        if (!extension) throw new Error("Choose a JPG, PNG, WebP, or AVIF banner image.");
+        if (templateImage.size > 8 * 1024 * 1024) throw new Error("Banner images must be 8 MB or smaller.");
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) throw new Error("Sign in again before changing your canteen template.");
+        uploadedPath = `${canteen.id}/${crypto.randomUUID()}.${extension}`;
+        const storage = supabase.storage.from("canteen-home-banners");
+        const { error: uploadError } = await storage.upload(uploadedPath, templateImage, {
+          cacheControl: "3600",
+          contentType: templateImage.type,
+          upsert: false,
+        });
+        if (uploadError) throw new Error(`Could not upload the banner image: ${uploadError.message}`);
+        bannerImageUrl = storage.getPublicUrl(uploadedPath).data.publicUrl;
+      }
+      const { data, error } = await supabase
+        .from("canteen_templates")
+        .upsert({ canteen_id: canteen.id, banner_image_url: bannerImageUrl, heading, description }, { onConflict: "canteen_id" })
+        .select("canteen_id,banner_image_url,heading,description,updated_at")
+        .single();
+      if (error || !data) throw new Error(error?.message || "Could not save the canteen template.");
+      setTemplate(data);
+      setTemplateHeading(data.heading);
+      setTemplateDescription(data.description);
+      setTemplateImage(null);
+      setTab("menu");
+    } catch (error) {
+      if (uploadedPath) await supabase.storage.from("canteen-home-banners").remove([uploadedPath]);
+      setTemplateError(error instanceof Error ? error.message : "Could not save the canteen template.");
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -266,7 +347,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         </header>
         {canteen.visibility === "maintenance" && <p className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm text-primary-bright">Your canteen is in maintenance mode — customers can't place orders.</p>}
         <div className="mt-6 flex gap-2">
-          {([['menu', `Menu (${menu.length})`], ['orders', `Live Orders (${orders.filter((o) => o.status !== "collected" && o.status !== "cancelled").length})`]] as const).map(([k, l]) => (
+          {([['menu', `Menu (${menu.length})`], ['orders', `Live Orders (${orders.filter((o) => o.status !== "collected" && o.status !== "cancelled").length})`], ['template', "Change Template"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={cn("rounded-full border px-4 py-2 text-xs font-semibold", tab === k ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{l}</button>
           ))}
         </div>
@@ -294,6 +375,42 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
               </div>
             ))}
           </div>
+        ) : tab === "template" ? (
+          <form onSubmit={saveTemplate} className="glass-red mt-6 grid gap-4 rounded-3xl p-5">
+            <div>
+              <h2 className="display text-xl">Student Home Banner</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Customize the banner students see on this canteen's Home page.</p>
+            </div>
+            <label className="space-y-2">
+              <span className="block text-xs font-semibold text-foreground">Banner image (JPG, PNG, WebP, or AVIF; max 8 MB)</span>
+              <input
+                type="file"
+                name="templateImage"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                aria-label="Choose canteen banner image"
+                onChange={(event) => setTemplateImage(event.currentTarget.files?.[0] ?? null)}
+                className={cn(field, "file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground")}
+              />
+            </label>
+            <input name="templateHeading" maxLength={120} value={templateHeading} onChange={(event) => setTemplateHeading(event.currentTarget.value)} placeholder="Heading (optional)" className={field} />
+            <textarea name="templateDescription" maxLength={500} value={templateDescription} onChange={(event) => setTemplateDescription(event.currentTarget.value)} placeholder="Description (optional)" rows={3} className={field} />
+            <div>
+              <p className="mb-2 text-xs font-semibold text-foreground">Preview</p>
+              <CanteenTemplateBanner
+                imageUrl={templatePreview ?? template.banner_image_url}
+                heading={templateHeading}
+                description={templateDescription}
+                canteenName={canteen.name}
+                universityName={canteen.university_name}
+                preview
+              />
+            </div>
+            {templateError && <p role="alert" className="text-sm text-primary-bright">{templateError}</p>}
+            <div className="flex gap-2">
+              <button disabled={savingTemplate} className="rounded-full bg-primary px-6 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">{savingTemplate ? "Saving template…" : "Save template"}</button>
+              <button type="button" disabled={savingTemplate} onClick={() => { setTemplateImage(null); setTemplateError(""); setTab("menu"); }} className="rounded-full border border-border px-6 py-2.5 text-xs text-muted-foreground disabled:opacity-60">Cancel</button>
+            </div>
+          </form>
         ) : (
           <div className="mt-6">
             <button onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing({ veg: true, available: true }); }} className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Add item</button>
