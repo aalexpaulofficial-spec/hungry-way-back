@@ -18,6 +18,7 @@ Database scripts (run in order in the Supabase SQL Editor):
 2. `database/002_payments_coupons_refunds.sql`
 3. `database/003_canteen_owner_credentials.sql`
 4. `database/004_canteen_owner_credential_guard.sql`
+5. `database/005_canteen_menu_images.sql`
 
 ## Development
 ```bash

@@ -135,16 +135,22 @@ const NEXT: Record<string, string | undefined> = { placed: "preparing", preparin
 const IMAGES = ["food-indian", "food-bowl", "food-burger", "food-pizza", "food-coffee", "campus-cafeteria"];
 
 function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
-  const [tab, setTab] = useState<"orders" | "menu">("orders");
+  const [tab, setTab] = useState<"orders" | "menu">("menu");
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [editing, setEditing] = useState<Partial<MenuItem> | null>(null);
-  useBackStep(tab !== "orders", () => setTab("orders"));
+  const [foodImageFile, setFoodImageFile] = useState<File | null>(null);
+  const [foodImagePreview, setFoodImagePreview] = useState<string | null>(null);
+  useBackStep(tab !== "menu", () => setTab("menu"));
   useBackStep(!!editing, () => setEditing(null));
   const [err, setErr] = useState("");
   const [orderMsg, setOrderMsg] = useState("");
   const [busyOrder, setBusyOrder] = useState<string | null>(null);
   const move = useServerFn(ownerUpdateOrderStatus);
+
+  useEffect(() => () => {
+    if (foodImagePreview) URL.revokeObjectURL(foodImagePreview);
+  }, [foodImagePreview]);
 
   async function setStatus(o: Order, status: "preparing" | "ready" | "collected" | "cancelled") {
     if (status === "cancelled" && !window.confirm(o.payment_status === "paid" ? `Cancel ${o.order_number}? The customer will be refunded ₹${o.total} automatically.` : `Cancel ${o.order_number}?`)) return;
@@ -185,6 +191,8 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
     e.preventDefault();
     setErr("");
     const fd = new FormData(e.currentTarget);
+    const imageSelection = String(fd.get("image") ?? "food-indian");
+    const keepCurrentImage = imageSelection === "__current_uploaded_image__" && !!editing?.image;
     const row = {
       canteen_id: canteen.id,
       name: String(fd.get("name") ?? "").trim().slice(0, 80),
@@ -195,18 +203,47 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
       counter: String(fd.get("counter") ?? "").trim().slice(0, 30) || "Counter 1",
       tag: String(fd.get("tag") ?? "").trim().slice(0, 30) || null,
       stock: String(fd.get("stock") ?? "").trim() === "" ? null : Math.max(0, Math.round(Number(fd.get("stock")))),
-      image: String(fd.get("image") ?? "food-indian"),
+      image: keepCurrentImage ? String(editing?.image) : imageSelection,
       veg: fd.get("veg") === "on",
       available: fd.get("available") === "on",
     };
     if (!row.name || !Number.isFinite(row.price) || row.price < 0) return setErr("Enter a name and a valid price.");
     if (row.stock !== null && !Number.isFinite(row.stock)) return setErr("Stock must be a number, or empty for unlimited.");
+    let uploadedPath: string | null = null;
+    if (foodImageFile) {
+      const mimeToExtension: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/avif": "avif",
+      };
+      const extension = mimeToExtension[foodImageFile.type];
+      if (!extension) return setErr("Choose a JPG, PNG, WEBP, or AVIF food image.");
+      if (foodImageFile.size > 8 * 1024 * 1024) return setErr("Food images must be 8 MB or smaller.");
+      uploadedPath = `${canteen.id}/${crypto.randomUUID()}.${extension}`;
+      const storage = supabase.storage.from("canteen-menu-images");
+      const { error: uploadError } = await storage.upload(uploadedPath, foodImageFile, {
+        cacheControl: "3600",
+        contentType: foodImageFile.type,
+        upsert: false,
+      });
+      if (uploadError) return setErr("Could not upload food image.");
+      row.image = storage.getPublicUrl(uploadedPath).data.publicUrl;
+    }
     const { error } = editing?.id
       ? await supabase.from("menu_items").update(row).eq("id", editing.id)
       : await supabase.from("menu_items").insert(row);
-    if (error) return setErr("Could not save item.");
+    if (error) {
+      if (uploadedPath) await supabase.storage.from("canteen-menu-images").remove([uploadedPath]);
+      return setErr("Could not save item.");
+    }
     setEditing(null);
+    setFoodImageFile(null);
+    setFoodImagePreview(null);
   }
+
+  const editingImageIsUrl = typeof editing?.image === "string" && /^https?:\/\//i.test(editing.image);
+  const formImagePreview = foodImagePreview ?? (editing?.image ? foodImage(editing.image) : null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,7 +261,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         </header>
         {canteen.visibility === "maintenance" && <p className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm text-primary-bright">Your canteen is in maintenance mode — customers can't place orders.</p>}
         <div className="mt-6 flex gap-2">
-          {([["orders", `Live orders (${orders.filter((o) => o.status !== "collected" && o.status !== "cancelled").length})`], ["menu", `Menu (${menu.length})`]] as const).map(([k, l]) => (
+          {([['menu', `Menu (${menu.length})`], ['orders', `Live Orders (${orders.filter((o) => o.status !== "collected" && o.status !== "cancelled").length})`]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={cn("rounded-full border px-4 py-2 text-xs font-semibold", tab === k ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{l}</button>
           ))}
         </div>
@@ -254,20 +291,39 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
           </div>
         ) : (
           <div className="mt-6">
-            <button onClick={() => setEditing({ veg: true, available: true, image: "food-indian" })} className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Add item</button>
+            <button onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing({ veg: true, available: true, image: "food-indian" }); }} className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Add item</button>
             {editing && (
               <form key={editing.id ?? "new"} onSubmit={save} className="glass-red mt-4 grid gap-3 rounded-3xl p-5 sm:grid-cols-2">
                 <input name="name" defaultValue={editing.name} placeholder="Item name" className={field} />
                 <input name="price" type="number" min={0} defaultValue={editing.price} placeholder="Price (₹)" className={field} />
                 <input name="category" defaultValue={editing.category} placeholder="Category (e.g. Meals)" className={field} />
-                <input name="prep_minutes" type="number" min={1} max={180} defaultValue={editing.prep_minutes ?? 10} placeholder="Prep minutes" className={field} />
+                <input name="prep_minutes" type="number" min={1} max={180} defaultValue={editing.prep_minutes ?? ""} placeholder="Prep minutes" className={field} />
                 <input name="counter" defaultValue={editing.counter} placeholder="Counter (e.g. Counter 1)" className={field} />
                 <input name="tag" defaultValue={editing.tag ?? ""} placeholder="Tag (optional, e.g. Bestseller)" className={field} />
                 <input name="stock" type="number" min={0} max={100000} defaultValue={editing.stock ?? ""} placeholder="Stock (empty = unlimited)" aria-label="Stock" className={field} />
                 <textarea name="description" defaultValue={editing.description} placeholder="Description" rows={2} className={cn(field, "sm:col-span-2")} />
-                <select name="image" defaultValue={editing.image} className={field}>
+                <select name="image" defaultValue={editingImageIsUrl ? "__current_uploaded_image__" : editing.image} className={field}>
+                  {editingImageIsUrl && <option value="__current_uploaded_image__">Current uploaded image</option>}
                   {IMAGES.map((i) => <option key={i} value={i}>{i.replace("food-", "").replace("-", " ")}</option>)}
                 </select>
+                <div className="space-y-2 sm:col-span-2">
+                  <label htmlFor="food-image-upload" className="block text-xs font-semibold text-foreground">Upload Food Image</label>
+                  <input
+                    id="food-image-upload"
+                    name="food_image"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    aria-label="Choose food image file"
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0] ?? null;
+                      setFoodImageFile(file);
+                      setFoodImagePreview(file ? URL.createObjectURL(file) : null);
+                    }}
+                    className={cn(field, "file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground")}
+                  />
+                  {formImagePreview && <img src={formImagePreview} alt="Food image preview" className="h-32 w-32 rounded-2xl border border-border object-cover" />}
+                  <p className="text-xs text-muted-foreground">Choose a JPG, PNG, WEBP, or AVIF image (up to 8 MB).</p>
+                </div>
                 <div className="flex items-center gap-5 text-sm">
                   <label className="flex items-center gap-2"><input type="checkbox" name="veg" defaultChecked={editing.veg} /> Veg</label>
                   <label className="flex items-center gap-2"><input type="checkbox" name="available" defaultChecked={editing.available} /> Available</label>
@@ -275,7 +331,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                 {err && <p className="text-xs text-primary-bright sm:col-span-2">{err}</p>}
                 <div className="flex gap-2 sm:col-span-2">
                   <button className="rounded-full bg-primary px-6 py-2.5 text-xs font-semibold text-primary-foreground">Save</button>
-                  <button type="button" onClick={() => setEditing(null)} className="rounded-full border border-border px-6 py-2.5 text-xs text-muted-foreground">Cancel</button>
+                  <button type="button" onClick={() => { setEditing(null); setFoodImageFile(null); setFoodImagePreview(null); }} className="rounded-full border border-border px-6 py-2.5 text-xs text-muted-foreground">Cancel</button>
                 </div>
               </form>
             )}
@@ -289,7 +345,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                     <p className="text-xs text-muted-foreground">{m.category} · ₹{m.price} · {m.prep_minutes}m{m.stock != null && ` · ${m.stock} in stock`}</p>
                   </div>
                   <button onClick={() => supabase.from("menu_items").update({ available: !m.available }).eq("id", m.id).then(() => {})} className={cn("rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest", m.available ? "bg-chart-4/20 text-chart-4" : "bg-muted text-muted-foreground")}>{m.available ? "Available" : "Sold out"}</button>
-                  <button aria-label="Edit" onClick={() => setEditing(m)} className="grid h-8 w-8 place-items-center rounded-full border border-border"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button aria-label="Edit" onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing(m); }} className="grid h-8 w-8 place-items-center rounded-full border border-border"><Pencil className="h-3.5 w-3.5" /></button>
                   <button aria-label="Delete" onClick={() => { if (confirm(`Remove ${m.name}?`)) void supabase.from("menu_items").delete().eq("id", m.id).then(() => {}); }} className="grid h-8 w-8 place-items-center rounded-full border border-border"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               ))}

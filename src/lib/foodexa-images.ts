@@ -15,5 +15,6 @@ const map: Record<string, string> = {
 };
 
 export function foodImage(key?: string | null) {
+  if (key && /^https?:\/\//i.test(key)) return key;
   return (key && map[key]) || cafeteria;
 }

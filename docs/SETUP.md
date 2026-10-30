@@ -20,8 +20,11 @@ Supabase dashboard → **SQL Editor → New query**. Paste each file's full cont
 | 2 | `database/002_payments_coupons_refunds.sql` | stock, order types & payment status, coupons, coupon redemptions, payments, webhook log, refunds, email log, transaction-safe order functions |
 | 3 | `database/003_canteen_owner_credentials.sql` | private owner credential and login rate-limit tables |
 | 4 | `database/004_canteen_owner_credential_guard.sql` | approved-only credential rules and owner/customer code separation |
+| 5 | `database/005_canteen_menu_images.sql` | public food-image reads and canteen-owner-only image uploads |
 
-Both should finish with "Success. No rows returned". If file 2 fails, do not edit it — re-check that file 1 ran first.
+Each file should finish with "Success. No rows returned". If a migration fails, stop and check that the preceding files ran first.
+
+After file 5, verify Storage contains the public `canteen-menu-images` bucket. Owner uploads are limited by Storage policies to each canteen owner's own folder.
 
 Verify: **Table Editor** shows `canteen_applications, canteens, coupon_redemptions, coupons, email_logs, menu_items, orders, payment_events, payments, profiles, refunds, user_roles`.
 **Database → Publications → supabase_realtime** includes `menu_items, orders, canteens, refunds`.
