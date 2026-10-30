@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Store, KeyRound, CheckCircle2 } from "lucide-react";
-import { submitCanteenApplication } from "@/lib/hungry.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { getCanteenOwnerAccess, submitCanteenApplication } from "@/lib/hungry.functions";
 import { applicationSchema } from "@/lib/access";
 import { cn } from "@/lib/utils";
 import { backendConfigured } from "@/lib/backend-config";
@@ -118,6 +120,33 @@ function RegisterForm() {
 }
 
 function DashboardLogin({ onRegister }: { onRegister: () => void }) {
+  const ownerAccess = useServerFn(getCanteenOwnerAccess);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const restoreOwnerDashboard = async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data.user) return;
+        const access = await ownerAccess({ data: {} });
+        if (active && access.linked && access.status === "approved") {
+          window.location.replace("/canteen");
+        }
+      } catch {
+        // If the saved session cannot be verified as an approved owner, keep the login form available.
+      } finally {
+        if (active) setCheckingSession(false);
+      }
+    };
+    void restoreOwnerDashboard();
+    return () => { active = false; };
+  }, [ownerAccess]);
+
+  if (checkingSession) {
+    return <p role="status" className="text-sm text-muted-foreground">Checking for an existing owner session…</p>;
+  }
+
   return (
     <div className="mx-auto max-w-md space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
