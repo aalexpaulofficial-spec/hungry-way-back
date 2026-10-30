@@ -9,10 +9,10 @@ const kpis = [
 ];
 
 const queue = [
-  ["#FX-2471", "Masala Dosa Thali", "Preparing"],
-  ["#FX-2470", "Campus Black Burger", "Ready"],
-  ["#FX-2468", "Paneer Rice Bowl", "Collected"],
-  ["#FX-2465", "Masala Chai ×2", "Ready"],
+  ["#HG-2471", "Masala Dosa Thali", "Preparing"],
+  ["#HG-2470", "Campus Black Burger", "Ready"],
+  ["#HG-2468", "Paneer Rice Bowl", "Collected"],
+  ["#HG-2465", "Masala Chai ×2", "Ready"],
 ];
 
 const bars = [34, 52, 41, 78, 96, 62, 48, 71, 88, 55, 39, 64];

@@ -312,7 +312,7 @@ function Screen({ screen }: { screen: ScreenKey }) {
         </div>
         <p className="display text-[16px]">Order placed</p>
         <p className="text-[9px] text-muted-foreground">
-          Order #FX-2471 · Block A Canteen
+          Order #HG-2471 · Block A Canteen
           <br />
           Ready in about 8 minutes.
         </p>
