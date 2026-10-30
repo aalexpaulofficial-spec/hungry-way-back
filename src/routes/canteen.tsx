@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { backendConfigured } from "@/lib/backend-config";
 import { SetupNotice } from "@/components/SetupNotice";
 import { CanteenOwnerLoginForm } from "@/components/foodexa/CanteenOwnerLoginForm";
+import { LanguageSelect, localizeDashboard, useDashboardLanguage } from "@/lib/dashboard-language";
 
 export const Route = createFileRoute("/canteen")({
   ssr: false,
@@ -41,6 +42,8 @@ function CanteenPage() {
   const ownerAccess = useServerFn(getCanteenOwnerAccess);
   const [state, setState] = useState<"loading" | "auth" | "ok" | "pending" | "rejected" | "missing" | "error">("loading");
   const [canteen, setCanteen] = useState<Canteen | null>(null);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const { language, saveLanguage } = useDashboardLanguage(ownerUserId);
   const [err, setErr] = useState("");
 
   const resolve = useCallback(async () => {
@@ -50,10 +53,12 @@ function CanteenPage() {
       const { data, error: authError } = await supabase.auth.getUser();
       if (authError) throw new Error("Could not verify your owner session. Please sign in again.");
       if (!data.user) {
+        setOwnerUserId(null);
         setCanteen(null);
         setState("auth");
         return;
       }
+      setOwnerUserId(data.user.id);
       const access = await ownerAccess({ data: {} });
       if (access.status !== "approved") {
         setCanteen(null);
@@ -75,6 +80,8 @@ function CanteenPage() {
     }
   }, [ownerAccess]);
 
+  useEffect(() => localizeDashboard(document.body, language), [language]);
+
   useEffect(() => {
     if (backendConfigured) resolve();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,12 +90,13 @@ function CanteenPage() {
   async function signOut() {
     await supabase.auth.signOut();
     setCanteen(null);
+    setOwnerUserId(null);
     setState("auth");
   }
 
   if (!backendConfigured) return <SetupNotice title="Canteen dashboard isn't connected yet" />;
   if (state === "loading") return <div role="status" className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
-  if (state === "ok" && canteen) return <Dashboard canteen={canteen} onSignOut={signOut} />;
+  if (state === "ok" && canteen) return <Dashboard canteen={canteen} onSignOut={signOut} language={language} onLanguageChange={saveLanguage} />;
 
   return (
     <div className="grain relative min-h-screen overflow-hidden bg-background px-4 py-10">
@@ -149,7 +157,7 @@ function normalizeCanteenTemplate(value: Partial<CanteenTemplate> | null | undef
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
 const BANNER_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
-export function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
+export function Dashboard({ canteen, onSignOut, language, onLanguageChange }: { canteen: Canteen; onSignOut: () => void; language: "en" | "hi" | "kn"; onLanguageChange: (language: "en" | "hi" | "kn") => void }) {
   const [tab, setTab] = useState<"menu" | "orders" | "template">("menu");
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -364,11 +372,14 @@ export function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut:
           <BackButton inline />
           <div className="min-w-0">
             <p className="text-[10px] tracking-[0.3em] text-primary-bright">CANTEEN DASHBOARD · {canteen.code}</p>
-            <h1 className="display text-3xl">{canteen.name}</h1>
-            <p className="text-sm text-muted-foreground">{canteen.university_name} · <span className="capitalize">{canteen.visibility}</span></p>
+            <h1 data-no-translate className="display text-3xl">{canteen.name}</h1>
+            <p className="text-sm text-muted-foreground"><span data-no-translate>{canteen.university_name}</span> · <span className="capitalize">{canteen.visibility}</span></p>
           </div>
           </div>
-          <button onClick={onSignOut} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"><LogOut className="h-3.5 w-3.5" /> Log out</button>
+          <div className="flex items-center gap-2">
+            <LanguageSelect language={language} onChange={onLanguageChange} />
+            <button onClick={onSignOut} className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs text-muted-foreground hover:text-foreground"><LogOut className="h-3.5 w-3.5" /> Log out</button>
+          </div>
         </header>
         {canteen.visibility === "maintenance" && <p className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm text-primary-bright">Your canteen is in maintenance mode — customers can't place orders.</p>}
         <div className="mt-6 flex gap-2">
@@ -389,7 +400,7 @@ export function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut:
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{o.customer_name} · pickup {o.pickup_code} · {new Date(o.created_at).toLocaleTimeString()}</p>
                 <p className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-primary-bright">{ORDER_TYPE_LABELS[o.order_type as OrderType] ?? "Dine-in"} · {o.payment_method === "counter" && o.payment_status === "unpaid" ? `Collect ₹${o.total} at counter` : (PAYMENT_STATUS_LABELS[o.payment_status] ?? o.payment_status)}</p>
-                <p className="mt-2 text-sm">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
+                <p data-no-translate className="mt-2 text-sm">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
                 <p className="mt-1 text-sm font-bold">₹{o.total}</p>
                 {NEXT[o.status] && (
                   <div className="mt-3 flex gap-2">
@@ -477,8 +488,8 @@ export function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut:
                 <div key={m.id} className={cn("flex items-center gap-4 rounded-3xl border border-border bg-card p-4", !m.available && "opacity-60")}>
                   <img src={foodImage(m.image)} alt="" className="h-14 w-14 rounded-xl object-cover" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{m.name}</p>
-                    <p className="text-xs text-muted-foreground">{m.category} · ₹{m.price} · {m.prep_minutes}m{m.stock != null && ` · ${m.stock} in stock`}</p>
+                    <p data-no-translate className="truncate text-sm font-semibold">{m.name}</p>
+                    <p className="text-xs text-muted-foreground"><span data-no-translate>{m.category}</span> · ₹{m.price} · {m.prep_minutes}m{m.stock != null && <> · {m.stock} <span>in stock</span></>}</p>
                   </div>
                   <button onClick={() => supabase.from("menu_items").update({ available: !m.available }).eq("id", m.id).then(() => {})} className={cn("rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest", m.available ? "bg-chart-4/20 text-chart-4" : "bg-muted text-muted-foreground")}>{m.available ? "Available" : "Sold out"}</button>
                   <button aria-label="Edit" onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing(m); }} className="grid h-8 w-8 place-items-center rounded-full border border-border"><Pencil className="h-3.5 w-3.5" /></button>

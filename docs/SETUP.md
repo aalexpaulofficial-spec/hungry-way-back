@@ -23,12 +23,14 @@ Supabase dashboard → **SQL Editor → New query**. Paste each file's full cont
 | 5 | `database/005_canteen_menu_images.sql` | public food-image reads and canteen-owner-only image uploads |
 | 6 | `database/006_canteen_templates.sql` | per-canteen home banner content, owner-scoped template access, and public banner image reads |
 | 7 | `database/007_canteen_template_crop.sql` | saved per-canteen banner position and zoom crop settings |
+| 8 | `database/008_user_language_preferences.sql` | private per-account dashboard language preferences (English, Hindi, Kannada) |
 
 Each file should finish with "Success. No rows returned". If a migration fails, stop and check that the preceding files ran first.
 
 After file 5, verify Storage contains the public `canteen-menu-images` bucket. Owner uploads are limited by Storage policies to each canteen owner's own folder.
 After file 6, verify the `canteen_templates` table and public `canteen-home-banners` Storage bucket exist. Canteen owners can only edit their own template and upload/delete banner images in their own folder.
 After file 7, banner crop position and zoom settings can be saved for each canteen independently.
+After file 8, each signed-in user can save their dashboard language preference; users can only read and update their own preference.
 
 Verify: **Table Editor** shows `canteen_applications, canteens, coupon_redemptions, coupons, email_logs, menu_items, orders, payment_events, payments, profiles, refunds, user_roles`.
 **Database → Publications → supabase_realtime** includes `menu_items, orders, canteens, refunds`.

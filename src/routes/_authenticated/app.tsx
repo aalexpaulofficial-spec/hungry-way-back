@@ -38,6 +38,7 @@ import {
 } from "@/lib/order-rules";
 import { openRazorpay, type CheckoutParams } from "@/lib/razorpay-checkout";
 import { cn } from "@/lib/utils";
+import { LanguageSelect, localizeDashboard, useDashboardLanguage } from "@/lib/dashboard-language";
 
 export const Route = createFileRoute("/_authenticated/app")({
   head: () => ({
@@ -70,6 +71,8 @@ const uid = () => Math.random().toString(36).slice(2);
 function OrderingApp() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  const { language, saveLanguage } = useDashboardLanguage(profile?.id);
+  useEffect(() => localizeDashboard(document.body, language), [language]);
   const [canteen, setCanteen] = useState<Canteen | null>(null);
   const [canteenTemplate, setCanteenTemplate] = useState<CanteenTemplate | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -260,8 +263,9 @@ function OrderingApp() {
           </div>
           <button onClick={() => setSwitching(true)} className="glass flex max-w-[55%] items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-primary-bright" />
-            <span className="truncate">{canteen.name}</span>
+            <span data-no-translate className="truncate">{canteen.name}</span>
           </button>
+          <LanguageSelect language={language} onChange={saveLanguage} />
         </header>
 
         {!ordering && (
@@ -403,7 +407,7 @@ function SwitchCampus({ current, onJoined }: { current: Canteen; onJoined: () =>
       <div className="mt-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-4">
         <Store className="h-5 w-5 text-primary-bright" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{current.name}</p>
+          <p data-no-translate className="truncate text-sm font-semibold">{current.name}</p>
           <p className="truncate text-xs text-muted-foreground">{current.university_name} · current</p>
         </div>
       </div>
@@ -429,7 +433,7 @@ function SwitchCampus({ current, onJoined }: { current: Canteen; onJoined: () =>
               >
                 <Repeat className="h-4 w-4 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{p.name}</p>
+                  <p data-no-translate className="truncate text-sm font-semibold">{p.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{p.university_name} · {p.campus_location}</p>
                 </div>
               </button>
@@ -471,12 +475,12 @@ function FoodCard({ item, onOpen, onAdd, wide }: { item: MenuItem; onOpen: (i: M
   return (
     <motion.div whileTap={{ scale: 0.97 }} className={cn("group overflow-hidden rounded-3xl border border-border bg-card", wide && "w-60 shrink-0")}>
       <button onClick={() => onOpen(item)} className="relative block aspect-[4/3] w-full overflow-hidden">
-        <img src={foodImage(item.image)} alt={item.name} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
-        {item.tag && <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground">{item.tag}</span>}
+        <img data-no-translate src={foodImage(item.image)} alt={item.name} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
+        {item.tag && <span data-no-translate className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground">{item.tag}</span>}
       </button>
       <div className="flex items-end justify-between gap-2 p-4">
         <button onClick={() => onOpen(item)} className="text-left">
-          <p className="text-sm font-semibold leading-tight">{item.name}</p>
+        <p data-no-translate className="text-sm font-semibold leading-tight">{item.name}</p>
           <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{item.prep_minutes}m</span>
             <span>{item.veg ? "Veg" : "Non-veg"}</span>
@@ -504,9 +508,9 @@ function HomeTab({ menu, canteen, template, onOpen, onAdd, goMenu }: { menu: Men
         <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={bannerCropStyle({ x: template?.banner_crop_x, y: template?.banner_crop_y, zoom: template?.banner_crop_zoom })} />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-5 left-5 right-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
-          <p className="display mt-1 text-3xl">{template?.heading?.trim() || "Skip the queue."}</p>
-          {template?.description?.trim() && <p className="mt-2 max-w-xl text-sm text-foreground/90">{template.description.trim()}</p>}
+          <p data-no-translate className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
+          <p data-no-translate={template?.heading?.trim() ? "" : undefined} className="display mt-1 text-3xl">{template?.heading?.trim() || "Skip the queue."}</p>
+          {template?.description?.trim() && <p data-no-translate className="mt-2 max-w-xl text-sm text-foreground/90">{template.description.trim()}</p>}
           <button onClick={goMenu} className="mt-3 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground">Order now ↗</button>
         </div>
       </div>
@@ -539,7 +543,7 @@ function MenuTab({ menu, onOpen, onAdd }: { menu: MenuItem[]; onOpen: (i: MenuIt
       <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={50} placeholder="Search dishes…" className="w-full rounded-full border border-input bg-card px-5 py-3 text-sm outline-none focus:border-primary" />
       <div className="-mx-5 mt-4 flex gap-2 overflow-x-auto px-5">
         {cats.map((c) => (
-          <button key={c} onClick={() => setCat(c)} className={cn("shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition", cat === c ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{c}</button>
+          <button data-no-translate key={c} onClick={() => setCat(c)} className={cn("shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition", cat === c ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{c}</button>
         ))}
       </div>
       <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -552,14 +556,14 @@ function MenuTab({ menu, onOpen, onAdd }: { menu: MenuItem[]; onOpen: (i: MenuIt
 function ItemDetail({ item, qty, onAdd }: { item: MenuItem; qty: number; onAdd: (d: number) => void }) {
   return (
     <div>
-      <img src={foodImage(item.image)} alt={item.name} className="aspect-[16/10] w-full object-cover" />
+      <img data-no-translate src={foodImage(item.image)} alt={item.name} className="aspect-[16/10] w-full object-cover" />
       <div className="p-6">
         <div className="flex items-center gap-2 text-xs">
           <span className={cn("rounded-full border px-2 py-0.5 font-semibold", item.veg ? "border-chart-4 text-chart-4" : "border-primary text-primary")}>{item.veg ? "VEG" : "NON-VEG"}</span>
-          <span className="text-muted-foreground">{item.counter}</span>
+          <span data-no-translate className="text-muted-foreground">{item.counter}</span>
         </div>
-        <h3 className="display mt-3 text-3xl">{item.name}</h3>
-        <p className="mt-3 text-sm text-muted-foreground">{item.description}</p>
+        <h3 data-no-translate className="display mt-3 text-3xl">{item.name}</h3>
+        <p data-no-translate className="mt-3 text-sm text-muted-foreground">{item.description}</p>
         <div className="mt-4 flex gap-4 text-sm text-muted-foreground">
           <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{item.prep_minutes} min</span>
         </div>
@@ -726,7 +730,7 @@ function Checkout({ cart, subtotal, ordering, onAdd, onPlaced }: { cart: CartLin
         {cart.map((l) => (
           <div key={l.item.id} className="flex items-center gap-3 rounded-2xl bg-ink-soft p-3">
             <img src={foodImage(l.item.image)} alt="" className="h-14 w-14 rounded-xl object-cover" />
-            <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{l.item.name}</p><p className="text-xs text-muted-foreground">₹{l.item.price}</p></div>
+            <div className="min-w-0 flex-1"><p data-no-translate className="truncate text-sm font-semibold">{l.item.name}</p><p className="text-xs text-muted-foreground">₹{l.item.price}</p></div>
             <Stepper qty={l.qty} onAdd={(d) => onAdd(l.item, d)} />
           </div>
         ))}
@@ -794,7 +798,7 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
   if (!orders.length) return <Empty title="No orders yet" text="Your orders, tracking and pickup QR codes will show up here." />;
   return (
     <div className="space-y-3 pt-2">
-      {orders.map((o) => (
+        {orders.map((o) => (
         <button key={o.id} onClick={() => onOpen(o)} className="w-full rounded-3xl border border-border bg-card p-5 text-left transition hover:border-primary/50">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-sm font-bold">{o.order_number}</span>
@@ -803,7 +807,7 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
           <div className="mt-2 flex justify-end">
             <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest", o.status === "ready" || o.status === "pending_payment" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{ORDER_LABELS[o.status]}</span>
           </div>
-          <p className="mt-2 truncate text-sm text-muted-foreground">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
+          <p data-no-translate className="mt-2 truncate text-sm text-muted-foreground">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
           <p className="mt-2 flex items-center justify-between text-sm">
             <span className="font-bold">₹{o.total}</span>
             <span className="text-xs text-muted-foreground">{ORDER_TYPE_LABELS[o.order_type as OrderType] ?? "Dine-in"} · {PAYMENT_STATUS_LABELS[o.payment_status] ?? o.payment}</span>
@@ -940,11 +944,11 @@ function OrderDetail({ order, refund, notice, onNotice }: { order: Order; refund
           </div>
           <p className="mt-4 text-xs uppercase tracking-widest text-muted-foreground">Pickup code</p>
           <p className="display text-3xl tracking-[0.3em]">{order.pickup_code}</p>
-          <p className="mt-2 text-xs text-muted-foreground">Show at {order.counter} · ready in ~{order.prep_minutes} min</p>
+          <p className="mt-2 text-xs text-muted-foreground"><span>Show at</span> <span data-no-translate>{order.counter}</span> · <span>ready in ~{order.prep_minutes} min</span></p>
         </div>
       )}
       <div className="mt-5 space-y-1 text-sm text-muted-foreground">
-        {order.lines.map((l, i) => <div key={i} className="flex justify-between"><span>{l.qty}× {l.name}</span><span>₹{l.qty * l.price}</span></div>)}
+        {order.lines.map((l, i) => <div key={i} className="flex justify-between"><span data-no-translate>{l.qty}× {l.name}</span><span>₹{l.qty * l.price}</span></div>)}
         {order.discount > 0 && <div className="flex justify-between"><span>Coupon {order.coupon_code}</span><span>−₹{order.discount}</span></div>}
         <div className="flex justify-between pt-2 font-bold text-foreground"><span>{order.payment}</span><span>₹{order.total}</span></div>
       </div>
@@ -972,13 +976,13 @@ function YouTab({ profile, canteen, onSwitch, onSignOut }: { profile: Profile; c
     <div className="space-y-4 pt-2">
       <div className="glass-red rounded-[2rem] p-6">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">{profile.full_name[0]}</div>
-        <p className="display mt-4 text-2xl">{profile.full_name}</p>
-        <p className="text-sm capitalize text-muted-foreground">{profile.role}{profile.registration_number && ` · ${profile.registration_number}`}</p>
+        <p data-no-translate className="display mt-4 text-2xl">{profile.full_name}</p>
+        <p className="text-sm capitalize text-muted-foreground">{profile.role}{profile.registration_number && <> · <span data-no-translate>{profile.registration_number}</span></>}</p>
         <p className="text-sm text-muted-foreground">{profile.email}</p>
       </div>
       <div className="rounded-3xl border border-border bg-card p-5 text-sm">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">Current canteen</p>
-        <p className="mt-1 font-semibold">{canteen.name}</p>
+        <p data-no-translate className="mt-1 font-semibold">{canteen.name}</p>
         <p className="text-xs text-muted-foreground">{canteen.university_name} · {canteen.campus_location}</p>
         <p className="mt-1 text-xs text-chart-4">Verified HUNGRY canteen</p>
       </div>

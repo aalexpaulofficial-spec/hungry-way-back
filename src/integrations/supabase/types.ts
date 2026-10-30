@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_language_preferences: {
+        Row: { user_id: string; language: string; updated_at: string }
+        Insert: { user_id: string; language?: string; updated_at?: string }
+        Update: { user_id?: string; language?: string; updated_at?: string }
+        Relationships: []
+      }
       canteen_applications: {
         Row: {
           campus_location: string
