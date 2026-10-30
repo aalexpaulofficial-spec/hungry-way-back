@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useServerFn } from "@tanstack/react-start";
-import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store } from "lucide-react";
+import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store, Sparkles } from "lucide-react";
 import { BackButton, useBackStep } from "@/lib/back-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { foodImage } from "@/lib/foodexa-images";
@@ -54,7 +54,7 @@ type Profile = { id: string; full_name: string; role: string; registration_numbe
 type Canteen = { id: string; name: string; university_name: string; campus_location: string; visibility: string; is_active: boolean };
 type CartLine = { item: MenuItem; qty: number };
 type Order = {
-  id: string; order_number: string; pickup_code: string; lines: { name: string; qty: number; price: number }[];
+  id: string; user_id: string; order_number: string; pickup_code: string; lines: { name: string; qty: number; price: number }[];
   subtotal: number; discount: number; total: number; coupon_code: string | null; payment: string; payment_method: string; payment_status: string;
   order_type: string; created_at: string; prep_minutes: number; counter: string; status: string; canteen_id: string;
 };
@@ -69,6 +69,10 @@ function OrderingApp() {
   const [canteen, setCanteen] = useState<Canteen | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [collectedOrder, setCollectedOrder] = useState<Order | null>(null);
+  const orderSnapshot = useRef(new Map<string, Order>());
+  const ordersInitialized = useRef(false);
+  const pendingCollectionEvents = useRef(new Map<string, Order>());
   const [tab, setTab] = useState<Tab>("home");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [detail, setDetail] = useState<MenuItem | null>(null);
@@ -140,10 +144,28 @@ function OrderingApp() {
 
   const userId = profile?.id;
   useEffect(() => {
+    orderSnapshot.current = new Map();
+    ordersInitialized.current = false;
+    pendingCollectionEvents.current.clear();
+    setCollectedOrder(null);
     if (!userId) return;
     const load = async () => {
       const { data } = await supabase.from("orders").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
-      setOrders((data as unknown as Order[]) ?? []);
+      const nextOrders = (data as unknown as Order[]) ?? [];
+      if (ordersInitialized.current) {
+        const newlyCollected = nextOrders.find((order) => order.status === "collected" && orderSnapshot.current.get(order.id)?.status !== "collected");
+        if (newlyCollected) setCollectedOrder(newlyCollected);
+      } else {
+        const pending = Array.from(pendingCollectionEvents.current.keys()).find((id) => nextOrders.some((order) => order.id === id && order.status === "collected"));
+        if (pending) {
+          const matchingOrder = nextOrders.find((order) => order.id === pending);
+          if (matchingOrder) setCollectedOrder(matchingOrder);
+        }
+        pendingCollectionEvents.current.clear();
+        ordersInitialized.current = true;
+      }
+      orderSnapshot.current = new Map(nextOrders.map((order) => [order.id, order]));
+      setOrders(nextOrders);
     };
     const loadRefunds = async () => {
       const { data } = await supabase.from("refunds").select("id, order_id, amount, status, admin_note, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(50);
@@ -153,7 +175,17 @@ function OrderingApp() {
     loadRefunds();
     const ch = supabase
       .channel(`my-orders-${uid()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `user_id=eq.${userId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `user_id=eq.${userId}` }, (payload) => {
+        const updatedOrder = payload.new as Order;
+        if (payload.eventType === "UPDATE" && updatedOrder.user_id === userId && updatedOrder.status === "collected") {
+          if (!ordersInitialized.current) pendingCollectionEvents.current.set(updatedOrder.id, updatedOrder);
+          else if (orderSnapshot.current.get(updatedOrder.id)?.status !== "collected") {
+            orderSnapshot.current.set(updatedOrder.id, updatedOrder);
+            setCollectedOrder(updatedOrder);
+          }
+        }
+        void load();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "refunds", filter: `user_id=eq.${userId}` }, loadRefunds)
       .subscribe();
     return () => {
@@ -284,6 +316,9 @@ function OrderingApp() {
           }}
         />
       </Sheet>
+      <AnimatePresence>
+        {collectedOrder && <CollectionCelebration onContinue={() => { setCollectedOrder(null); setOpenOrderId(null); setNotice(""); setTab("menu"); }} />}
+      </AnimatePresence>
     </div>
   );
 }
@@ -751,6 +786,9 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
         <button key={o.id} onClick={() => onOpen(o)} className="w-full rounded-3xl border border-border bg-card p-5 text-left transition hover:border-primary/50">
           <div className="flex items-center justify-between gap-2">
             <span className="font-mono text-sm font-bold">{o.order_number}</span>
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary-bright"><Clock className="h-3 w-3" />{o.prep_minutes} min</span>
+          </div>
+          <div className="mt-2 flex justify-end">
             <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest", o.status === "ready" || o.status === "pending_payment" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{ORDER_LABELS[o.status]}</span>
           </div>
           <p className="mt-2 truncate text-sm text-muted-foreground">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
@@ -761,6 +799,63 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
         </button>
       ))}
     </div>
+  );
+}
+
+function CollectionCelebration({ onContinue }: { onContinue: () => void }) {
+  const colors = ["#ff3b3b", "#ff6961", "#f6c85f", "#f8f4f0", "#d91f2b"];
+  return (
+    <motion.div
+      className="fixed inset-0 z-[80] grid place-items-center overflow-hidden px-5"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="collection-celebration-title"
+    >
+      <div className="absolute inset-0 bg-background/90 backdrop-blur-xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        {Array.from({ length: 34 }, (_, index) => (
+          <motion.span
+            key={index}
+            className="absolute top-[-5vh] rounded-sm shadow-[0_0_12px_currentColor]"
+            initial={{ y: "-5vh", opacity: 0, rotate: 0 }}
+            animate={{ y: "110vh", opacity: [0, 1, 1, 0], rotate: 720 + index * 15 }}
+            transition={{ duration: 3.4 + (index % 5) * 0.45, delay: (index % 9) * 0.12, repeat: Infinity, ease: "linear" }}
+            style={{
+              left: `${(index * 37) % 100}%`,
+              width: index % 4 === 0 ? 5 : 8,
+              height: index % 4 === 0 ? 12 : 7,
+              color: colors[index % colors.length],
+              backgroundColor: colors[index % colors.length],
+            }}
+          />
+        ))}
+      </div>
+      <motion.div
+        initial={{ y: 24, scale: 0.96, opacity: 0 }}
+        animate={{ y: 0, scale: 1, opacity: 1 }}
+        exit={{ y: 12, scale: 0.98, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 24 }}
+        className="glass-red relative w-full max-w-md overflow-hidden rounded-[2rem] p-8 text-center shadow-[var(--shadow-cinema)] sm:p-10"
+      >
+        <div aria-hidden="true" className="ember pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 opacity-60" />
+        <motion.div
+          animate={{ rotate: [0, -7, 7, 0], scale: [1, 1.06, 1] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          className="relative mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-primary/40 bg-primary/10 text-primary-bright"
+        >
+          <Sparkles className="h-8 w-8" />
+        </motion.div>
+        <p className="relative mt-6 text-[10px] font-bold tracking-[0.32em] text-primary-bright">ORDER COLLECTED</p>
+        <h2 id="collection-celebration-title" className="display relative mt-3 text-2xl leading-tight sm:text-3xl">THANK YOU FOR USING HUNGRY!</h2>
+        <p className="relative mt-4 text-sm text-muted-foreground">Great food. Zero queues. See you hungry again!</p>
+        <button onClick={onContinue} className="relative mt-8 w-full rounded-full bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground transition hover:shadow-[0_0_40px_-6px_var(--primary-bright)]">
+          Continue Exploring
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -788,8 +883,16 @@ function OrderDetail({ order, refund, notice, onNotice }: { order: Order; refund
 
   return (
     <div className="p-6">
-      <p className="text-xs uppercase tracking-widest text-muted-foreground">Order ID</p>
-      <p className="display mt-1 font-mono text-3xl">{order.order_number}</p>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Order ID</p>
+          <p className="display mt-1 truncate font-mono text-2xl sm:text-3xl">{order.order_number}</p>
+        </div>
+        <div className="mb-1 flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary-bright">
+          <Clock className="h-3.5 w-3.5" />
+          {order.prep_minutes} min
+        </div>
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">{ORDER_TYPE_LABELS[order.order_type as OrderType] ?? "Dine-in"} · {PAYMENT_STATUS_LABELS[order.payment_status] ?? order.payment}</p>
       {notice && <p className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm" role="status">{notice}</p>}
 
