@@ -842,13 +842,9 @@ function CollectionCelebration({ onContinue }: { onContinue: () => void }) {
         className="glass-red relative w-full max-w-md overflow-hidden rounded-[2rem] p-8 text-center shadow-[var(--shadow-cinema)] sm:p-10"
       >
         <div aria-hidden="true" className="ember pointer-events-none absolute -top-28 left-1/2 h-56 w-56 -translate-x-1/2 opacity-60" />
-        <motion.div
-          animate={{ rotate: [0, -7, 7, 0], scale: [1, 1.06, 1] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          className="relative mx-auto"
-        >
+        <div className="relative mx-auto">
           <LogoMark className="h-16 w-16 text-2xl" />
-        </motion.div>
+        </div>
         <p className="relative mt-6 text-[10px] font-bold tracking-[0.32em] text-primary-bright">ORDER COLLECTED</p>
         <h2 id="collection-celebration-title" className="display relative mt-3 text-2xl leading-tight sm:text-3xl">THANK YOU FOR USING HUNGRY!</h2>
         <p className="relative mt-4 text-sm text-muted-foreground">Great food. Zero queues. See you hungry again!</p>
