@@ -1,3 +1,6 @@
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
+
 const groups = [
   ["Platform", ["For Students", "For Faculty", "Institutions", "Analytics"]],
   ["Company", ["Pricing", "FAQ", "Login", "Contact"]],
@@ -18,6 +21,32 @@ const hrefMap: Record<string, string> = {
 };
 
 export function Footer() {
+  const navigate = useNavigate();
+  const logoClicks = useRef(0);
+  const clickReset = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (clickReset.current) clearTimeout(clickReset.current);
+  }, []);
+
+  function onFooterLogoClick(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    logoClicks.current += 1;
+    if (clickReset.current) clearTimeout(clickReset.current);
+
+    if (logoClicks.current === 3) {
+      logoClicks.current = 0;
+      clickReset.current = null;
+      void navigate({ to: "/admin" });
+      return;
+    }
+
+    clickReset.current = setTimeout(() => {
+      logoClicks.current = 0;
+      clickReset.current = null;
+    }, 1500);
+  }
+
   return (
     <footer className="relative isolate overflow-hidden border-t border-border bg-ink py-16">
       <div
@@ -27,13 +56,14 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,0.6fr)]">
         <div>
           <div className="flex items-center gap-2.5">
-            <a
-              href="/admin"
+            <button
+              type="button"
+              onClick={onFooterLogoClick}
               aria-label="HUNGRY"
-              className="grid h-9 w-9 place-items-center rounded-full bg-primary text-[12px] font-black text-primary-foreground transition hover:scale-110"
+              className="grid h-9 w-9 place-items-center rounded-full border-0 bg-primary p-0 text-[12px] font-black text-primary-foreground transition hover:scale-110"
             >
               H
-            </a>
+            </button>
             <span className="display text-[14px] tracking-[0.3em]">HUNGRY</span>
           </div>
           <p className="mt-4 text-[10px] tracking-[0.3em] text-muted-foreground">

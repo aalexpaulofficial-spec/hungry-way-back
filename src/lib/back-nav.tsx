@@ -41,6 +41,31 @@ export function useBackStep(active: boolean, onBack: () => void) {
   }, [ctx, active]);
 }
 
+export function getBackFallbackPath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length <= 1) return "/";
+  return `/${segments.slice(0, -1).join("/")}`;
+}
+
+export function navigateBack(
+  router: ReturnType<typeof useRouter>,
+  pathname: string,
+  steps: Step[],
+) {
+  const top = steps[steps.length - 1];
+  if (top) {
+    top.fn();
+    return;
+  }
+
+  if (typeof window !== "undefined" && window.history.length > 1) {
+    router.history.back();
+    return;
+  }
+
+  void router.navigate({ to: getBackFallbackPath(pathname) as never });
+}
+
 /**
  * `inline` renders the arrow inside a page header (next to the logo);
  * while an inline arrow is mounted the floating corner arrow hides, so there is never a duplicate or overlap.
@@ -58,10 +83,7 @@ export function BackButton({ inline = false }: { inline?: boolean }) {
   if (pathname === "/") return null;
   if (!inline && (ctx?.inline ?? 0) > 0) return null;
   const goBack = () => {
-    const top = ctx?.stack.current[ctx.stack.current.length - 1];
-    if (top) return top.fn();
-    if (typeof window !== "undefined" && window.history.length > 1) router.history.back();
-    else router.navigate({ to: "/" });
+    navigateBack(router, pathname, ctx?.stack.current ?? []);
   };
   return (
     <button type="button" onClick={goBack} aria-label="Go back" className={inline ? "back-btn back-btn-inline" : "back-btn back-btn-float"}>
