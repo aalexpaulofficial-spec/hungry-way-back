@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { accessCodeSchema, signupSchema, canAcceptOrders, generateCanteenCode } from "@/lib/access";
+import { accessCodeSchema, signupSchema, canAcceptOrders, generateCanteenCode, isCustomerRole } from "@/lib/access";
 
 const base = { role: "student", fullName: "Asha K", registrationNumber: "21CS001", email: "a@b.co", password: "password1" };
 
@@ -13,6 +13,14 @@ describe("access rules", () => {
   });
   it("signup does not require a canteen code", () => {
     expect(signupSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("allows only student, faculty, and guest accounts to join with a customer code", () => {
+    expect(isCustomerRole("student")).toBe(true);
+    expect(isCustomerRole("faculty")).toBe(true);
+    expect(isCustomerRole("guest")).toBe(true);
+    expect(isCustomerRole("canteen_owner")).toBe(false);
+    expect(isCustomerRole("admin")).toBe(false);
   });
   it("registration number optional only for guests", () => {
     expect(signupSchema.safeParse({ ...base, registrationNumber: "" }).success).toBe(false);

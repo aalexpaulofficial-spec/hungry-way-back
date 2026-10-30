@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ShieldCheck, LogOut, Check, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { adminLogin, approveApplication, approveRefund, createCoupon, rejectApplication, rejectRefund, setCanteenVisibility, setCouponActive } from "@/lib/hungry.functions";
+import { adminLogin, approveApplication, approveRefund, createCoupon, issueCanteenOwnerCredentials, rejectApplication, rejectRefund, setCanteenVisibility, setCouponActive } from "@/lib/hungry.functions";
 import { REFUND_STATUS_LABELS } from "@/lib/order-rules";
 import { visibilities, type Visibility } from "@/lib/access";
 import { cn } from "@/lib/utils";
@@ -91,6 +91,7 @@ type Canteen = { id: string; code: string; name: string; university_name: string
 function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   const approve = useServerFn(approveApplication);
   const reject = useServerFn(rejectApplication);
+  const issueOwnerCredentials = useServerFn(issueCanteenOwnerCredentials);
   const setVis = useServerFn(setCanteenVisibility);
   const [tab, setTab] = useState<"pending" | "reviewed" | "canteens" | "refunds" | "coupons" | "payments" | "emails">("pending");
   useBackStep(tab !== "pending", () => setTab("pending"));
@@ -174,7 +175,7 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                 {a.notes && <p className="mt-3 text-sm text-muted-foreground">“{a.notes}”</p>}
                 {a.status === "pending" && (
                   <div className="mt-5 flex gap-2">
-                    <button disabled={busy === a.id} onClick={() => act(a.id, async () => { const r = await approve({ data: { id: a.id } }); return `Approved ${a.canteen_name}. Code: ${r.code}. ${r.emailSent ? "Code emailed to the canteen." : "Email could not be sent — share this code with the canteen manually."}`; })} className="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Check className="h-4 w-4" /> Approve</button>
+                    <button disabled={busy === a.id} onClick={() => act(a.id, async () => { const r = await approve({ data: { id: a.id } }); return r.emailSent ? `Approved ${a.canteen_name}. Canteen Owner ID, Owner Password Code, and Student/Faculty/Guest Canteen Code were emailed to ${a.contact_email}.` : `Approved ${a.canteen_name}, but the email could not be sent. Share these privately with ${a.contact_email}: Owner ID ${r.ownerLoginId}, Owner Password Code ${r.ownerLoginCode}, customer canteen code ${r.code}.`; })} className="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"><Check className="h-4 w-4" /> Approve</button>
                     <button disabled={busy === a.id} onClick={() => act(a.id, async () => { await reject({ data: { id: a.id } }); return `Rejected ${a.canteen_name}.`; })} className="flex items-center gap-1.5 rounded-full border border-border px-5 py-2.5 text-xs font-semibold text-muted-foreground disabled:opacity-50"><X className="h-4 w-4" /> Reject</button>
                   </div>
                 )}
@@ -191,7 +192,8 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
                   <p className="text-xs text-muted-foreground">{c.university_name} · {c.contact_email}</p>
                   <p className="mt-1 font-mono text-sm tracking-[0.3em] text-primary-bright">{c.code}</p>
                   <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{c.owner_user_id ? "Dashboard linked" : "Owner not signed in yet"}</p>
-                </div>
+                  <button disabled={busy === c.id} onClick={() => act(c.id, async () => { const r = await issueOwnerCredentials({ data: { canteenId: c.id } }); return r.emailSent ? `New Canteen Owner ID and Owner Password Code emailed to ${c.contact_email}.` : `Email failed. Share privately with ${c.contact_email}: Owner ID ${r.ownerLoginId}, Owner Password Code ${r.ownerLoginCode}.`; })} className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary-bright disabled:opacity-50">Resend owner credentials</button>
+              </div>
                 <div className="flex rounded-full bg-ink p-1">
                   {visibilities.map((v) => (
                     <button key={v} disabled={busy === c.id} onClick={() => act(c.id, async () => { await setVis({ data: { id: c.id, visibility: v as Visibility } }); return `${c.name} set to ${v}.`; })} className={cn("rounded-full px-3 py-1.5 text-[11px] font-semibold capitalize", c.visibility === v ? "bg-primary text-primary-foreground" : "text-muted-foreground")}>{v}</button>

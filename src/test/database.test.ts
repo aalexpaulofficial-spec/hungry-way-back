@@ -23,6 +23,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, au
 CREATE PUBLICATION supabase_realtime;`);
     await db.exec(readFileSync(path.join(root, "database/001_hungry_core.sql"), "utf8"));
     await db.exec(readFileSync(path.join(root, "database/002_payments_coupons_refunds.sql"), "utf8"));
+    await db.exec(readFileSync(path.join(root, "database/003_canteen_owner_credentials.sql"), "utf8"));
+    await db.exec(readFileSync(path.join(root, "database/004_canteen_owner_credential_guard.sql"), "utf8"));
 
     const failures: string[] = [];
     const ok = (c: boolean | undefined, m: string) => { if (!c) failures.push(m); };
@@ -31,7 +33,9 @@ CREATE PUBLICATION supabase_realtime;`);
 
     const [a] = await q(`INSERT INTO auth.users (email, raw_user_meta_data) VALUES ('a@x.com', '{"role":"student","full_name":"Asha K","registration_number":"R1"}') RETURNING id`);
     const [b] = await q(`INSERT INTO auth.users (email, raw_user_meta_data) VALUES ('b@x.com', '{"role":"guest","full_name":"Bala"}') RETURNING id`);
-    ok((await q(`SELECT count(*)::int n FROM profiles`))[0].n === 2, "signup trigger creates profiles");
+    await q(`INSERT INTO auth.users (email, raw_user_meta_data) VALUES ('f@x.com', '{"role":"faculty","full_name":"Faculty User","registration_number":"F1"}')`);
+    await q(`INSERT INTO auth.users (email, raw_user_meta_data) VALUES ('owner@owners.hungry.invalid', '{"role":"canteen_owner","full_name":"Owner User"}')`);
+    ok((await q(`SELECT count(*)::int n FROM profiles`))[0].n === 3, "student, faculty, and guest users receive profiles but owner identities do not");
     const [c] = await q(`INSERT INTO canteens (code, name, university_name, campus_location, contact_email) VALUES ('ABC1234','Main','Uni','Block A','o@x.com') RETURNING id`);
     const [m1] = await q(`INSERT INTO menu_items (canteen_id, name, price, stock) VALUES ($1,'Dosa',50,3) RETURNING id`, [c.id]);
     const [m2] = await q(`INSERT INTO menu_items (canteen_id, name, price) VALUES ($1,'Tea',20) RETURNING id`, [c.id]);
@@ -92,8 +96,34 @@ CREATE PUBLICATION supabase_realtime;`);
     ok(!!(await err(`SELECT hungry_mark_order_paid($1)`, [oc.order_id])), "customers cannot mark orders paid");
     ok((await q(`SELECT count(*)::int n FROM coupons`))[0].n === 0, "customers cannot list coupons");
     ok((await q(`SELECT count(*)::int n FROM email_logs`))[0].n === 0, "customers cannot read email logs");
+    ok(!!(await err(`SELECT * FROM canteen_owner_credentials`)), "customers cannot read owner credential hashes");
     ok(!!(await err(`INSERT INTO payments (order_id,user_id,razorpay_order_id,razorpay_payment_id,amount_paise,status) VALUES ($1,$2,'o','p',1,'captured')`, [o1.order_id, a.id])), "customers cannot insert payments");
     await db.exec(`RESET ROLE`);
+
+    const [application] = await q(`INSERT INTO canteen_applications (owner_name,owner_phone,canteen_name,university_name,campus_location,contact_email,fssai_license,owner_id_proof,status) VALUES ('Asha K','1234567890','Main','Uni','Block A','owner@x.com','FSSAI12345','ID1234','approved') RETURNING id`);
+    await q(`UPDATE canteens SET application_id=$1 WHERE id=$2`, [application.id, c.id]);
+    const salt = "0123456789abcdef0123456789abcdef";
+    const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const [credential] = await q(`INSERT INTO canteen_owner_credentials (canteen_id,login_id,code_salt,code_hash) VALUES ($1,'ABCDEFG',$2,$3) RETURNING login_id,code_salt,code_hash`, [c.id, salt, hash]);
+    ok(credential.login_id === "ABCDEFG" && credential.login_id.length === 7, "approved canteen receives a unique seven-character owner ID");
+    ok(credential.code_hash === hash && credential.code_hash !== "WNR2223", "database stores only the owner password code hash");
+    ok(!!(await err(`INSERT INTO canteen_owner_credentials (canteen_id,login_id,code_salt,code_hash) VALUES ($1,'SHORT1',$2,$3)`, [c.id, salt, hash])), "database rejects owner IDs with the wrong length");
+    ok(!!(await err(`INSERT INTO canteen_owner_credentials (canteen_id,login_id,code_salt,code_hash) VALUES ($1,'ABC1234',$2,$3)`, [c.id, salt, hash])), "owner ID cannot equal the customer canteen code");
+    ok(!!(await err(`INSERT INTO canteens (code,name,university_name,campus_location,contact_email) VALUES ('ABCDEFG','Duplicate','Uni','Block D','duplicate@x.com')`)), "customer canteen code cannot equal an owner ID");
+
+    const [pendingApp] = await q(`INSERT INTO canteen_applications (owner_name,owner_phone,canteen_name,university_name,campus_location,contact_email,fssai_license,owner_id_proof,status) VALUES ('Pending Owner','1234567890','Pending','Uni','Block B','pending@x.com','FSSAI12346','ID12345','pending') RETURNING id`);
+    const [pendingCanteen] = await q(`INSERT INTO canteens (code,application_id,name,university_name,campus_location,contact_email) VALUES ('PND1234',$1,'Pending','Uni','Block B','pending@x.com') RETURNING id`, [pendingApp.id]);
+    ok(!!(await err(`INSERT INTO canteen_owner_credentials (canteen_id,login_id,code_salt,code_hash) VALUES ($1,'BCDEFGH',$2,$3)`, [pendingCanteen.id, salt, hash])), "pending applications cannot receive active owner credentials");
+    const [rejectedApp] = await q(`INSERT INTO canteen_applications (owner_name,owner_phone,canteen_name,university_name,campus_location,contact_email,fssai_license,owner_id_proof,status) VALUES ('Rejected Owner','1234567890','Rejected','Uni','Block C','rejected@x.com','FSSAI12347','ID12346','rejected') RETURNING id`);
+    const [rejectedCanteen] = await q(`INSERT INTO canteens (code,application_id,name,university_name,campus_location,contact_email) VALUES ('REJ1234',$1,'Rejected','Uni','Block C','rejected@x.com') RETURNING id`, [rejectedApp.id]);
+    ok(!!(await err(`INSERT INTO canteen_owner_credentials (canteen_id,login_id,code_salt,code_hash) VALUES ($1,'CDEFGHJ',$2,$3)`, [rejectedCanteen.id, salt, hash])), "rejected applications cannot receive active owner credentials");
+
+    const ipKey = "a".repeat(64);
+    const ownerKey = "b".repeat(64);
+    let rateAllowed = true;
+    for (let i = 0; i < 5; i++) rateAllowed = (await q(`SELECT hungry_allow_canteen_owner_login($1,$2) allowed`, [ipKey, ownerKey]))[0].allowed;
+    ok(rateAllowed, "owner login permits up to five attempts per rate-limit window");
+    ok(!(await q(`SELECT hungry_allow_canteen_owner_login($1,$2) allowed`, [ipKey, ownerKey]))[0].allowed, "owner login rate limit blocks the next attempt");
 
 
     expect(failures).toEqual([]);

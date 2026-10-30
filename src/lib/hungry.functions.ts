@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
@@ -6,9 +7,13 @@ import {
   applicationSchema,
   canAcceptOrders,
   generateCanteenCode,
+  isCustomerRole,
   visibilities,
 } from "@/lib/access";
 import { couponCodeSchema } from "@/lib/coupons";
+import type { CanteenApplicationStatus } from "@/lib/canteen-owner-flow";
+import { canAccessOwnerCanteen } from "@/lib/canteen-owner-flow";
+import { generateOwnerCredentialPair, hashOwnerLoginCode, ownerLoginRateLimitKey, verifyOwnerCredentialPair } from "@/lib/owner-credentials";
 import {
   ORDER_TYPES,
   PAYMENT_METHODS,
@@ -57,6 +62,122 @@ export const submitCanteenApplication = createServerFn({ method: "POST" })
     });
     if (error) throw new Error("Could not submit your application. Please try again.");
     return { ok: true };
+  });
+
+/* ---------------- Public: approved canteen owner login ---------------- */
+export const loginCanteenOwner = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({
+    loginId: z.string().trim().toUpperCase().regex(/^[A-Z2-9]{7}$/),
+    code: z.string().trim().toUpperCase().regex(/^[A-Z2-9]{7}$/),
+  }).parse(input))
+  .handler(async ({ data }) => {
+    const db = await admin();
+    const request = getRequest();
+    const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const ip = forwarded || request.headers.get("x-real-ip")?.trim() || "unknown";
+    const [ipKey, ownerKey] = await Promise.all([
+      ownerLoginRateLimitKey(`ip:${ip}`),
+      ownerLoginRateLimitKey(`owner:${data.loginId}`),
+    ]);
+    const { data: allowed, error: limitError } = await db.rpc("hungry_allow_canteen_owner_login", {
+      p_ip_key: ipKey,
+      p_owner_key: ownerKey,
+    });
+    if (limitError) throw new Error("Owner login is temporarily unavailable. Please try again later.");
+    if (!allowed) throw new Error("Too many login attempts. Wait 15 minutes and try again.");
+
+    const { data: credential, error: credentialError } = await db
+      .from("canteen_owner_credentials")
+      .select("canteen_id,login_id,code_salt,code_hash")
+      .eq("login_id", data.loginId)
+      .maybeSingle();
+    if (credentialError) throw new Error("Owner login is temporarily unavailable. Please try again later.");
+    const invalid = "Canteen Owner ID or Password Code is invalid, or this canteen is not approved.";
+    if (!credential || !(await verifyOwnerCredentialPair(data.loginId, data.code, credential))) throw new Error(invalid);
+
+    const { data: canteen, error: canteenError } = await db
+      .from("canteens")
+      .select("id,application_id,name,is_active,owner_user_id")
+      .eq("id", credential.canteen_id)
+      .maybeSingle();
+    if (canteenError) throw new Error("Owner login is temporarily unavailable. Please try again later.");
+    if (!canteen?.is_active || !canteen.application_id) throw new Error(invalid);
+    const { data: application, error: applicationError } = await db
+      .from("canteen_applications")
+      .select("status,owner_name")
+      .eq("id", canteen.application_id)
+      .maybeSingle();
+    if (applicationError) throw new Error("Owner login is temporarily unavailable. Please try again later.");
+    if (!application || !canAccessOwnerCanteen(canteen.is_active, application.status)) throw new Error(invalid);
+
+    const ownerEmail = `canteen-owner-${canteen.id}@owners.hungry.invalid`;
+    let ownerUser: { id: string; email?: string } | null = null;
+    if (canteen.owner_user_id) {
+      const { data: current, error } = await db.auth.admin.getUserById(canteen.owner_user_id);
+      if (error) throw new Error("Could not prepare your owner session. Please try again.");
+      if (current.user?.email?.toLowerCase() === ownerEmail) ownerUser = current.user;
+    }
+    if (!ownerUser) {
+      const { data: created, error } = await db.auth.admin.createUser({
+        email: ownerEmail,
+        email_confirm: true,
+        user_metadata: { role: "canteen_owner", full_name: application.owner_name },
+      });
+      if (created.user) ownerUser = created.user;
+      else if (error) ownerUser = await findAuthUserByEmail(db, ownerEmail);
+      if (!ownerUser) throw new Error("Could not prepare your owner account. Please try again.");
+    }
+    if (canteen.owner_user_id !== ownerUser.id) {
+      const { error } = await db.from("canteens").update({ owner_user_id: ownerUser.id }).eq("id", canteen.id);
+      if (error) throw new Error("Could not link your owner account. Please try again.");
+    }
+
+    const { data: link, error: linkError } = await db.auth.admin.generateLink({ type: "magiclink", email: ownerEmail });
+    if (linkError || !link.properties.hashed_token) throw new Error("Could not create a secure owner session. Please try again.");
+    const { createClient } = await import("@supabase/supabase-js");
+    const authUrl = process.env["SUPABASE_URL"];
+    const publishableKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
+    if (!authUrl || !publishableKey) throw new Error("Owner login is not configured. Please contact support.");
+    const authClient = createClient(authUrl, publishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { data: sessionData, error: sessionError } = await authClient.auth.verifyOtp({
+      token_hash: link.properties.hashed_token,
+      type: link.properties.verification_type,
+    });
+    if (sessionError || !sessionData.session) throw new Error("Could not create a secure owner session. Please try again.");
+    return { accessToken: sessionData.session.access_token, refreshToken: sessionData.session.refresh_token };
+  });
+
+async function findAuthUserByEmail(db: Awaited<ReturnType<typeof admin>>, email: string) {
+  for (let page = 1; page <= 100; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error || !data) throw new Error("Could not safely check for an existing owner account. Please try again.");
+    const user = data.users.find((candidate) => candidate.email?.trim().toLowerCase() === email.toLowerCase());
+    if (user) return user;
+    if (data.users.length < 1000) return null;
+  }
+  throw new Error("Could not safely check for an existing owner account. Please try again.");
+}
+
+export const getCanteenOwnerAccess = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({}).parse(input))
+  .handler(async ({ context }) => {
+    const db = await admin();
+    const { data: canteen, error } = await db.from("canteens")
+      .select("id,application_id,owner_user_id,is_active")
+      .eq("owner_user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error("Could not verify your approved canteen. Please try again.");
+    if (!canteen || !canteen.application_id || !canteen.is_active) return { status: "missing" as const, linked: false };
+    const { data: application, error: applicationError } = await db.from("canteen_applications")
+      .select("status")
+      .eq("id", canteen.application_id)
+      .maybeSingle();
+    if (applicationError) throw new Error("Could not verify your approved canteen. Please try again.");
+    const status = (application?.status ?? "missing") as CanteenApplicationStatus;
+    return { status, linked: canAccessOwnerCanteen(canteen.is_active, status) };
   });
 
 /* ---------------- Public: admin login (server-verified) ---------------- */
@@ -112,13 +233,30 @@ export const approveApplication = createServerFn({ method: "POST" })
     let code = "";
     for (let i = 0; i < 10; i++) {
       const c = generateCanteenCode();
-      const { count } = await db.from("canteens").select("id", { count: "exact", head: true }).eq("code", c);
-      if (!count) {
+      const [{ count: canteenCount, error: canteenError }, { count: ownerIdCount, error: ownerIdError }] = await Promise.all([
+        db.from("canteens").select("id", { count: "exact", head: true }).eq("code", c),
+        db.from("canteen_owner_credentials").select("canteen_id", { count: "exact", head: true }).eq("login_id", c),
+      ]);
+      if (canteenError || ownerIdError) throw new Error("Could not check canteen code availability");
+      if (!canteenCount && !ownerIdCount) {
         code = c;
         break;
       }
     }
     if (!code) throw new Error("Could not generate a unique code, try again");
+    let ownerLoginId = "";
+    let ownerLoginCode = "";
+    for (let i = 0; i < 10; i++) {
+      const pair = generateOwnerCredentialPair(code);
+      const [{ count: ownerIdCount, error: ownerIdError }, { count: customerCodeCount, error: customerCodeError }] = await Promise.all([
+        db.from("canteen_owner_credentials").select("canteen_id", { count: "exact", head: true }).eq("login_id", pair.loginId),
+        db.from("canteens").select("id", { count: "exact", head: true }).eq("code", pair.loginId),
+      ]);
+      if (ownerIdError || customerCodeError) throw new Error("Could not check owner ID availability");
+      if (!ownerIdCount && !customerCodeCount) { ownerLoginId = pair.loginId; ownerLoginCode = pair.loginCode; break; }
+    }
+    if (!ownerLoginId) throw new Error("Could not generate a unique owner ID, try again");
+    const codeHash = await hashOwnerLoginCode(ownerLoginCode);
     // Claim the application first so two admins can't approve it twice.
     const { data: claimed } = await db
       .from("canteen_applications")
@@ -128,25 +266,82 @@ export const approveApplication = createServerFn({ method: "POST" })
       .select("id")
       .maybeSingle();
     if (!claimed) throw new Error("Application was already reviewed");
-    const { error } = await db.from("canteens").insert({
+    const { data: canteen, error } = await db.from("canteens").insert({
       code,
       application_id: app.id,
       name: app.canteen_name,
       university_name: app.university_name,
       campus_location: app.campus_location,
       contact_email: app.contact_email,
-    });
-    if (error) {
+    }).select("id").single();
+    if (error || !canteen) {
       await db.from("canteen_applications").update({ status: "pending", reviewed_at: null }).eq("id", app.id);
       throw new Error("Could not create canteen");
+    }
+    const { error: credentialsError } = await db.from("canteen_owner_credentials").insert({
+      canteen_id: canteen.id,
+      login_id: ownerLoginId,
+      code_salt: codeHash.salt,
+      code_hash: codeHash.hash,
+    });
+    if (credentialsError) {
+      await db.from("canteens").delete().eq("application_id", app.id);
+      await db.from("canteen_applications").update({ status: "pending", reviewed_at: null }).eq("id", app.id);
+      throw new Error("Could not securely prepare owner login credentials");
     }
     const { sendCanteenEmail } = await import("@/lib/canteen-email.server");
     const email = await sendCanteenEmail("approved", app.contact_email, {
       canteenName: app.canteen_name,
       university: app.university_name,
       code,
+      ownerLoginId,
+      ownerLoginCode,
     }, app.id);
-    return { code, emailSent: email.sent };
+    return { code, ownerLoginId, ownerLoginCode, emailSent: email.sent };
+  });
+
+export const issueCanteenOwnerCredentials = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ canteenId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const db = await admin();
+    const { data: canteen, error } = await db.from("canteens")
+      .select("id,application_id,code,name,university_name,contact_email,is_active")
+      .eq("id", data.canteenId).maybeSingle();
+    if (error || !canteen?.application_id || !canteen.is_active) throw new Error("Could not find an active approved canteen.");
+    const { data: application, error: applicationError } = await db.from("canteen_applications")
+      .select("status").eq("id", canteen.application_id).maybeSingle();
+    if (applicationError || !canAccessOwnerCanteen(canteen.is_active, application?.status)) throw new Error("Only approved canteens can receive owner credentials.");
+    let loginId = "";
+    let loginCode = "";
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const pair = generateOwnerCredentialPair(canteen.code);
+      const [{ count: ownerIdCount, error: ownerIdError }, { count: customerCodeCount, error: customerCodeError }] = await Promise.all([
+        db.from("canteen_owner_credentials").select("canteen_id", { count: "exact", head: true }).eq("login_id", pair.loginId),
+        db.from("canteens").select("id", { count: "exact", head: true }).eq("code", pair.loginId),
+      ]);
+      if (ownerIdError || customerCodeError) throw new Error("Could not check owner ID availability");
+      if (!ownerIdCount && !customerCodeCount) { loginId = pair.loginId; loginCode = pair.loginCode; break; }
+    }
+    if (!loginId) throw new Error("Could not generate a unique owner ID, try again");
+    const hashed = await hashOwnerLoginCode(loginCode);
+    const { error: saveError } = await db.from("canteen_owner_credentials").upsert({
+      canteen_id: canteen.id,
+      login_id: loginId,
+      code_salt: hashed.salt,
+      code_hash: hashed.hash,
+    }, { onConflict: "canteen_id" });
+    if (saveError) throw new Error("Could not save owner credentials. Please try again.");
+    const { sendCanteenEmail } = await import("@/lib/canteen-email.server");
+    const email = await sendCanteenEmail("approved", canteen.contact_email, {
+      canteenName: canteen.name,
+      university: canteen.university_name,
+      code: canteen.code,
+      ownerLoginId: loginId,
+      ownerLoginCode: loginCode,
+    }, canteen.application_id);
+    return { ownerLoginId: loginId, ownerLoginCode: loginCode, emailSent: email.sent };
   });
 
 export const rejectApplication = createServerFn({ method: "POST" })
@@ -272,8 +467,8 @@ export const rejectRefund = createServerFn({ method: "POST" })
 /* ---------------- Customers ---------------- */
 async function setCurrentCanteen(userId: string, canteenId: string) {
   const db = await admin();
-  const { data: p } = await db.from("profiles").select("id").eq("id", userId).maybeSingle();
-  if (!p) throw new Error("Only student, faculty and guest accounts can join a canteen.");
+  const { data: p, error } = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
+  if (error || !p || !isCustomerRole(p.role)) throw new Error("Only student, faculty and guest accounts can join a canteen.");
   await db.from("profiles").update({ current_canteen_id: canteenId }).eq("id", userId);
 }
 
@@ -541,22 +736,6 @@ export const requestRefund = createServerFn({ method: "POST" })
   });
 
 /* ---------------- Canteen owners ---------------- */
-export const claimCanteen = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ code: accessCodeSchema }).parse(input))
-  .handler(async ({ data, context }) => {
-    const email = String((context.claims as { email?: string }).email ?? "").toLowerCase();
-    const db = await admin();
-    const { data: c } = await db.from("canteens").select("id, contact_email, owner_user_id, is_active").eq("code", data.code).maybeSingle();
-    if (!c || !c.is_active)
-      throw new Error("This code isn't an approved canteen. Unapproved canteens must register first.");
-    if (c.contact_email.toLowerCase() !== email)
-      throw new Error("Sign in with the contact email used in your canteen application.");
-    if (c.owner_user_id && c.owner_user_id !== context.userId) throw new Error("This canteen is already linked to another account.");
-    if (!c.owner_user_id) await db.from("canteens").update({ owner_user_id: context.userId }).eq("id", c.id).is("owner_user_id", null);
-    return { id: c.id };
-  });
-
 export const ownerUpdateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>

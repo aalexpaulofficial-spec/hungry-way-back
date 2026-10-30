@@ -62,6 +62,59 @@ export type Database = {
         }
         Relationships: []
       }
+      canteen_owner_credentials: {
+        Row: {
+          canteen_id: string
+          code_hash: string
+          code_salt: string
+          created_at: string
+          login_id: string
+        }
+        Insert: {
+          canteen_id: string
+          code_hash: string
+          code_salt: string
+          created_at?: string
+          login_id: string
+        }
+        Update: {
+          canteen_id?: string
+          code_hash?: string
+          code_salt?: string
+          created_at?: string
+          login_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "canteen_owner_credentials_canteen_id_fkey"
+            columns: ["canteen_id"]
+            isOneToOne: true
+            referencedRelation: "canteens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      canteen_owner_login_limits: {
+        Row: {
+          attempts: number
+          blocked_until: string | null
+          key_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          blocked_until?: string | null
+          key_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          blocked_until?: string | null
+          key_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       canteens: {
         Row: {
           application_id: string | null
@@ -647,6 +700,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      hungry_allow_canteen_owner_login: {
+        Args: { p_ip_key: string; p_owner_key: string }
         Returns: boolean
       }
       hungry_expire_stale_orders: {

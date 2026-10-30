@@ -1,17 +1,18 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackButton, useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { LogOut, Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { claimCanteen, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
+import { getCanteenOwnerAccess, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
 import { ORDER_TYPE_LABELS, PAYMENT_STATUS_LABELS, type OrderType } from "@/lib/order-rules";
 import { ORDER_LABELS, type MenuItem } from "@/lib/access";
 import { foodImage } from "@/lib/foodexa-images";
 import { cn } from "@/lib/utils";
 import { backendConfigured } from "@/lib/backend-config";
 import { SetupNotice } from "@/components/SetupNotice";
+import { CanteenOwnerLoginForm } from "@/components/foodexa/CanteenOwnerLoginForm";
 
 export const Route = createFileRoute("/canteen")({
   ssr: false,
@@ -35,33 +36,45 @@ const field =
 type Canteen = { id: string; code: string; name: string; university_name: string; visibility: string; is_active: boolean };
 
 function CanteenPage() {
-  const { code } = Route.useSearch();
-  const claim = useServerFn(claimCanteen);
-  const [state, setState] = useState<"loading" | "auth" | "code" | "ok">("loading");
+  const ownerAccess = useServerFn(getCanteenOwnerAccess);
+  const [state, setState] = useState<"loading" | "auth" | "ok" | "pending" | "rejected" | "missing" | "error">("loading");
   const [canteen, setCanteen] = useState<Canteen | null>(null);
-  const [codeInput, setCodeInput] = useState((code ?? "").toUpperCase().slice(0, 7));
   const [err, setErr] = useState("");
 
-  const resolve = useCallback(async (tryCode?: string) => {
+  const resolve = useCallback(async () => {
     setErr("");
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return setState("auth");
-    if (tryCode && /^[A-Z0-9]{7}$/.test(tryCode)) {
-      try {
-        await claim({ data: { code: tryCode } });
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : "Invalid code");
+    setState("loading");
+    try {
+      const { data, error: authError } = await supabase.auth.getUser();
+      if (authError) throw new Error("Could not verify your owner session. Please sign in again.");
+      if (!data.user) {
+        setCanteen(null);
+        setState("auth");
+        return;
       }
+      const access = await ownerAccess({ data: {} });
+      if (access.status !== "approved") {
+        setCanteen(null);
+        setState(access.status);
+        return;
+      }
+      const q = supabase
+        .from("canteens")
+        .select("id, code, name, university_name, visibility, is_active")
+        .eq("owner_user_id", data.user.id);
+      const { data: rows, error } = await q.limit(1);
+      if (error) throw new Error("Could not load your canteen. Please try again.");
+      const c = (rows?.[0] as Canteen | undefined) ?? null;
+      setCanteen(c);
+      setState(c ? "ok" : "missing");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not verify your canteen access. Please try again.");
+      setState("error");
     }
-    const q = supabase.from("canteens").select("id, code, name, university_name, visibility, is_active").eq("owner_user_id", data.user.id);
-    const { data: rows } = tryCode ? await q.eq("code", tryCode) : await q.limit(1);
-    const c = (rows?.[0] as Canteen | undefined) ?? null;
-    setCanteen(c);
-    setState(c ? "ok" : "code");
-  }, [claim]);
+  }, [ownerAccess]);
 
   useEffect(() => {
-    if (backendConfigured) resolve(codeInput || undefined);
+    if (backendConfigured) resolve();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -72,72 +85,47 @@ function CanteenPage() {
   }
 
   if (!backendConfigured) return <SetupNotice title="Canteen dashboard isn't connected yet" />;
-  if (state === "loading") return <div className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
+  if (state === "loading") return <div role="status" className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
   if (state === "ok" && canteen) return <Dashboard canteen={canteen} onSignOut={signOut} />;
 
   return (
     <div className="grain relative min-h-screen overflow-hidden bg-background px-4 py-10">
       <div className="ember anim-pulse-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2" />
       <div className="relative mx-auto w-full max-w-md">
-        <a href="/" className="mb-8 block text-center display text-[15px] tracking-[0.3em]">HUNGRY</a>
+        <Link to="/" className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY home">HUNGRY</Link>
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">Canteen Dashboard</p>
           {state === "auth" ? (
-            <OwnerAuth onDone={() => resolve(codeInput || undefined)} />
-          ) : (
-            <form onSubmit={(e) => { e.preventDefault(); resolve(codeInput); }} className="mt-3 space-y-4">
-              <h1 className="display text-2xl">Enter your canteen code</h1>
-              <p className="text-sm text-muted-foreground">Use the approved 7-character code from your approval email. Unapproved canteens must register first.</p>
-              <input value={codeInput} onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))} placeholder="ABC1234" aria-label="Canteen code" className={cn(field, "py-4 text-center font-mono text-2xl tracking-[0.5em]")} />
-              {err && <p className="text-xs text-primary-bright">{err}</p>}
-              <button className="w-full rounded-full bg-primary py-4 text-sm font-semibold text-primary-foreground">Open dashboard</button>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <a href="/register-canteen" className="hover:text-foreground">Register a canteen</a>
-                <button type="button" onClick={signOut} className="hover:text-foreground">Use another account</button>
-              </div>
-            </form>
-          )}
+            <div className="mt-4 space-y-4">
+              <h1 className="display text-2xl">Canteen Owner Login</h1>
+              <CanteenOwnerLoginForm initialError={err} onRegister={() => { window.location.href = "/register-canteen"; }} />
+            </div>
+          ) : state === "pending" || state === "rejected" || state === "missing" ? (
+            <div className="mt-4 space-y-4">
+              <h1 className="display text-2xl">
+                {state === "pending" ? "Application under review" : state === "rejected" ? "Application rejected" : "Application not found"}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {state === "pending"
+                  ? "Your canteen application is under review. We'll email you when it has been reviewed."
+                  : state === "rejected"
+                    ? "Your canteen application was rejected. No rejection reason is available here; contact HUNGRY support for details."
+                    : "No approved canteen is linked to this account. Sign in with your 7-character Canteen Owner ID and Owner Password Code."}
+              </p>
+              {state === "missing" && <a href="/register-canteen" className="block text-xs font-semibold text-primary-bright underline">Register your canteen</a>}
+              <button type="button" onClick={signOut} className="w-full rounded-full border border-border py-3 text-sm text-muted-foreground hover:text-foreground">Use another account</button>
+            </div>
+          ) : state === "error" ? (
+            <div className="mt-4 space-y-4">
+              <h1 className="display text-2xl">Could not load your dashboard</h1>
+              <p role="alert" className="text-sm text-primary-bright">{err}</p>
+              <button type="button" onClick={() => void resolve()} className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground">Try again</button>
+              <button type="button" onClick={signOut} className="w-full rounded-full border border-border py-3 text-sm text-muted-foreground hover:text-foreground">Sign out</button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
-  );
-}
-
-function OwnerAuth({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<"login" | "signup">("login");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const email = String(fd.get("email") ?? "").trim();
-    const password = String(fd.get("password") ?? "");
-    if (!email || password.length < 8) return setErr("Enter your email and a password of 8+ characters.");
-    setErr("");
-    setBusy(true);
-    const res = mode === "login"
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
-    setBusy(false);
-    if (res.error) return setErr(mode === "login" ? "Wrong email or password." : res.error.message);
-    if (!res.data.session) {
-      const r = await supabase.auth.signInWithPassword({ email, password });
-      if (r.error) return setErr("Account created. Please log in.");
-    }
-    onDone();
-  }
-  return (
-    <form onSubmit={submit} className="mt-3 space-y-4">
-      <h1 className="display text-2xl">{mode === "login" ? "Owner login" : "Create owner account"}</h1>
-      <p className="text-sm text-muted-foreground">Use the same contact email you gave in your canteen application.</p>
-      <input name="email" type="email" placeholder="Contact email" autoComplete="email" className={field} />
-      <input name="password" type="password" placeholder="Password (8+ characters)" autoComplete={mode === "login" ? "current-password" : "new-password"} className={field} />
-      {err && <p className="text-xs text-primary-bright">{err}</p>}
-      <button disabled={busy} className="w-full rounded-full bg-primary py-4 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? "Please wait…" : mode === "login" ? "Login" : "Create account"}</button>
-      <button type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")} className="block w-full text-center text-xs text-muted-foreground hover:text-foreground">
-        {mode === "login" ? "First time? Create your owner account" : "Already have an account? Log in"}
-      </button>
-    </form>
   );
 }
 

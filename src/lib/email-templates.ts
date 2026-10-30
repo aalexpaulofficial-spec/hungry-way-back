@@ -136,17 +136,19 @@ export function adminRefundEmail(d: { stage: string; orderNumber: string; cantee
   };
 }
 
-export function canteenDecisionEmail(kind: "approved" | "rejected", d: { canteenName: string; university: string; code?: string }): EmailContent {
+export function canteenDecisionEmail(kind: "approved" | "rejected", d: { canteenName: string; university: string; code?: string; ownerLoginId?: string; ownerLoginCode?: string }): EmailContent {
   const name = esc(d.canteenName);
   const uni = esc(d.university);
   if (kind === "approved") {
     const code = esc(d.code ?? "");
+    const ownerLoginId = esc(d.ownerLoginId ?? "");
+    const ownerLoginCode = esc(d.ownerLoginCode ?? "");
     return {
-      subject: `Your HUNGRY canteen is approved — code ${d.code}`,
-      text: `Great news! ${d.canteenName} (${d.university}) has been approved on HUNGRY.\n\nYour canteen code: ${d.code}\n\nHow to access your dashboard:\n1. Open the HUNGRY website and go to "Canteen Login".\n2. Enter your 7-character code: ${d.code}\n3. Sign in with this email address.\n\nKeep this code safe — customers can also use it to join your canteen.\n\n— Team HUNGRY`,
+      subject: `Your HUNGRY canteen is approved — owner login credentials inside`,
+      text: `Great news! ${d.canteenName} (${d.university}) has been approved on HUNGRY.\n\nCanteen Owner ID (7 characters): ${d.ownerLoginId}\nUse this ID to identify your owner account at Canteen Owner Login.\n\nCanteen Owner Password Code (7 characters): ${d.ownerLoginCode}\nThis is your separate secret code for signing in to your owner dashboard. Keep it private. No account signup, password creation, or email verification is required.\n\nStudent/Faculty/Guest Canteen Code (7 characters): ${d.code}\nStudents, faculty, and guests enter this shared code in their HUNGRY account to join your canteen. It cannot access the owner dashboard.\n\n— Team HUNGRY`,
       html: wrap(
         "You're approved on HUNGRY!",
-        `<p><b>${name}</b> (${uni}) has been verified.</p><p>Your canteen code:</p><p style="font-size:28px;letter-spacing:8px;font-family:monospace;background:#111;color:#fff;padding:14px 20px;border-radius:12px;display:inline-block">${code}</p><p><b>How to access your dashboard</b></p><ol><li>Open the HUNGRY website and go to <b>Canteen Login</b>.</li><li>Enter your 7-character code.</li><li>Sign in with this email address.</li></ol><p>Keep this code safe — customers can also use it to join your canteen.</p>`,
+        `<p><b>${name}</b> (${uni}) has been verified.</p><p><b>Canteen Owner ID (7 characters)</b></p><p style="font-size:22px;letter-spacing:3px;font-family:monospace;background:#111;color:#fff;padding:14px 20px;border-radius:12px;display:inline-block">${ownerLoginId}</p><p>Use this ID to identify your owner account at Canteen Owner Login.</p><p><b>Canteen Owner Password Code (7 characters)</b></p><p style="font-size:28px;letter-spacing:8px;font-family:monospace;background:#111;color:#fff;padding:14px 20px;border-radius:12px;display:inline-block">${ownerLoginCode}</p><p>This is your separate secret code for signing in to your owner dashboard. Keep it private. No account signup, password creation, or email verification is required.</p><hr style="border-color:#333;margin:24px 0"/><p><b>Student/Faculty/Guest Canteen Code (7 characters)</b></p><p style="font-size:24px;letter-spacing:7px;font-family:monospace;background:#111;color:#fff;padding:12px 18px;border-radius:12px;display:inline-block">${code}</p><p>Students, faculty, and guests enter this shared code in their HUNGRY account to join your canteen. It cannot access the owner dashboard.</p>`,
       ),
     };
   }

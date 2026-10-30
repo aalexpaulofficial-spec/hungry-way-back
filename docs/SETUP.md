@@ -18,6 +18,8 @@ Supabase dashboard → **SQL Editor → New query**. Paste each file's full cont
 |---|------|-----------------|
 | 1 | `database/001_hungry_core.sql` | roles, canteen applications, canteens, profiles, menu, orders, Row Level Security, signup trigger, realtime |
 | 2 | `database/002_payments_coupons_refunds.sql` | stock, order types & payment status, coupons, coupon redemptions, payments, webhook log, refunds, email log, transaction-safe order functions |
+| 3 | `database/003_canteen_owner_credentials.sql` | private owner credential and login rate-limit tables |
+| 4 | `database/004_canteen_owner_credential_guard.sql` | approved-only credential rules and owner/customer code separation |
 
 Both should finish with "Success. No rows returned". If file 2 fails, do not edit it — re-check that file 1 ran first.
 
@@ -75,7 +77,7 @@ Webhooks only reach a published site — publish first, then add the webhook.
 Razorpay test cards / UPI: <https://razorpay.com/docs/payments/payments/test-card-details/> (e.g. UPI `success@razorpay` / `failure@razorpay`).
 
 - [ ] **Register** a student at `/auth` → confirm email → log in → **welcome email** arrives once (check Admin → Email log).
-- [ ] **Canteen application** at `/register-canteen` → Admin (`/admin`, email `aalexpaulofficial@gmail.com` + `ADMIN_PASSWORD`) → **Approve** → approval email with 7-character code. Try **Reject** on a second one → rejection email.
+- [ ] **Canteen application** at `/register-canteen` → Admin (`/admin`) → **Approve** → approval email with a 7-character owner ID, separate owner password code, and student/faculty/guest canteen code. Sign in as owner with only the first two; use the third only to join as a customer. Try **Reject** on a second one → rejection email.
 - [ ] Canteen owner logs in at `/canteen` with the contact email + code → add menu items (one with stock `2`).
 - [ ] Student joins with the code → orders **Dine-in + Pay at counter** → order confirmation email, kitchen sees it instantly.
 - [ ] **Parcel**: online payment is not offered; the order is pay-at-counter only.

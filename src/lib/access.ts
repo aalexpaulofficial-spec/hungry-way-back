@@ -9,6 +9,10 @@ export const accessCodeSchema = z
 export const roles = ["student", "faculty", "guest"] as const;
 export type Role = (typeof roles)[number];
 
+export function isCustomerRole(role: unknown): role is Role {
+  return roles.includes(role as Role);
+}
+
 export const signupSchema = z
   .object({
     role: z.enum(roles),
