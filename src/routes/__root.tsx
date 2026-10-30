@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { BackProvider, BackButton } from "../lib/back-nav";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { isStandaloneApp, markAppInstalled } from "../lib/pwa-install";
 
 function NotFoundComponent() {
   return (
@@ -127,6 +128,13 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    const app = new URLSearchParams(window.location.search).get("hungry_app");
+    if (isStandaloneApp() && (app === "student" || app === "canteen")) {
+      markAppInstalled(app);
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
