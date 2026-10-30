@@ -14,7 +14,8 @@ const map: Record<string, string> = {
   "campus-cafeteria": cafeteria,
 };
 
-export function foodImage(key?: string | null) {
+export function foodImage(key?: string | null): string | undefined {
+  if (!key) return undefined;
   if (key && /^https?:\/\//i.test(key)) return key;
-  return (key && map[key]) || cafeteria;
+  return map[key] || cafeteria;
 }

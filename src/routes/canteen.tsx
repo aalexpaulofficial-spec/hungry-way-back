@@ -132,8 +132,6 @@ function CanteenPage() {
 type Order = { id: string; order_number: string; customer_name: string; lines: { name: string; qty: number }[]; total: number; discount: number; pickup_code: string; status: string; created_at: string; order_type: string; payment_method: string; payment_status: string };
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
-const IMAGES = ["food-indian", "food-bowl", "food-burger", "food-pizza", "food-coffee", "campus-cafeteria"];
-
 function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
   const [tab, setTab] = useState<"orders" | "menu">("menu");
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -191,8 +189,6 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
     e.preventDefault();
     setErr("");
     const fd = new FormData(e.currentTarget);
-    const imageSelection = String(fd.get("image") ?? "food-indian");
-    const keepCurrentImage = imageSelection === "__current_uploaded_image__" && !!editing?.image;
     const row = {
       canteen_id: canteen.id,
       name: String(fd.get("name") ?? "").trim().slice(0, 80),
@@ -203,7 +199,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
       counter: String(fd.get("counter") ?? "").trim().slice(0, 30) || "Counter 1",
       tag: String(fd.get("tag") ?? "").trim().slice(0, 30) || null,
       stock: String(fd.get("stock") ?? "").trim() === "" ? null : Math.max(0, Math.round(Number(fd.get("stock")))),
-      image: keepCurrentImage ? String(editing?.image) : imageSelection,
+      image: String(editing?.image ?? ""),
       veg: fd.get("veg") === "on",
       available: fd.get("available") === "on",
     };
@@ -241,9 +237,6 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
     setFoodImageFile(null);
     setFoodImagePreview(null);
   }
-
-  const editingImageIsUrl = typeof editing?.image === "string" && /^https?:\/\//i.test(editing.image);
-  const formImagePreview = foodImagePreview ?? (editing?.image ? foodImage(editing.image) : null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -291,21 +284,17 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
           </div>
         ) : (
           <div className="mt-6">
-            <button onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing({ veg: true, available: true, image: "food-indian" }); }} className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Add item</button>
+            <button onClick={() => { setFoodImageFile(null); setFoodImagePreview(null); setEditing({ veg: true, available: true }); }} className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Add item</button>
             {editing && (
               <form key={editing.id ?? "new"} onSubmit={save} className="glass-red mt-4 grid gap-3 rounded-3xl p-5 sm:grid-cols-2">
                 <input name="name" defaultValue={editing.name} placeholder="Item name" className={field} />
                 <input name="price" type="number" min={0} defaultValue={editing.price} placeholder="Price (₹)" className={field} />
                 <input name="category" defaultValue={editing.category} placeholder="Category (e.g. Meals)" className={field} />
-                <input name="prep_minutes" type="number" min={1} max={180} defaultValue={editing.prep_minutes ?? ""} placeholder="Prep minutes" className={field} />
+                <input name="prep_minutes" type="number" min={1} max={180} defaultValue={editing.prep_minutes ?? ""} placeholder="Preparation minutes" className={field} />
                 <input name="counter" defaultValue={editing.counter} placeholder="Counter (e.g. Counter 1)" className={field} />
                 <input name="tag" defaultValue={editing.tag ?? ""} placeholder="Tag (optional, e.g. Bestseller)" className={field} />
                 <input name="stock" type="number" min={0} max={100000} defaultValue={editing.stock ?? ""} placeholder="Stock (empty = unlimited)" aria-label="Stock" className={field} />
                 <textarea name="description" defaultValue={editing.description} placeholder="Description" rows={2} className={cn(field, "sm:col-span-2")} />
-                <select name="image" defaultValue={editingImageIsUrl ? "__current_uploaded_image__" : editing.image} className={field}>
-                  {editingImageIsUrl && <option value="__current_uploaded_image__">Current uploaded image</option>}
-                  {IMAGES.map((i) => <option key={i} value={i}>{i.replace("food-", "").replace("-", " ")}</option>)}
-                </select>
                 <div className="space-y-2 sm:col-span-2">
                   <label htmlFor="food-image-upload" className="block text-xs font-semibold text-foreground">Upload Food Image</label>
                   <input
@@ -321,7 +310,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                     }}
                     className={cn(field, "file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground")}
                   />
-                  {formImagePreview && <img src={formImagePreview} alt="Food image preview" className="h-32 w-32 rounded-2xl border border-border object-cover" />}
+                  {foodImagePreview && <img src={foodImagePreview} alt="Selected food image preview" className="h-32 w-32 rounded-2xl border border-border object-cover" />}
                   <p className="text-xs text-muted-foreground">Choose a JPG, PNG, WEBP, or AVIF image (up to 8 MB).</p>
                 </div>
                 <div className="flex items-center gap-5 text-sm">
