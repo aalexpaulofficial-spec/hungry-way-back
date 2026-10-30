@@ -149,7 +149,7 @@ function normalizeCanteenTemplate(value: Partial<CanteenTemplate> | null | undef
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
 const BANNER_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
-function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
+export function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => void }) {
   const [tab, setTab] = useState<"menu" | "orders" | "template">("menu");
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
