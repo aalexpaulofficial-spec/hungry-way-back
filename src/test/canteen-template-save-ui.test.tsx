@@ -95,8 +95,8 @@ describe("canteen template save flow", () => {
       banner_image_url: expect.stringMatching(/^https:\/\/storage\.example\/canteen-1\//),
       heading: "Welcome",
       description: "Fresh food",
-      banner_crop_x: 40,
-      banner_crop_y: 60,
+      banner_crop_x: 0,
+      banner_crop_y: 100,
       banner_crop_zoom: 1.8,
     }));
     expect(mocks.uploadedPath).toMatch(/^canteen-1\//);
@@ -104,6 +104,6 @@ describe("canteen template save flow", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Change Template/ }));
     await waitFor(() => expect(screen.getByRole("slider", { name: "Banner image zoom" })).toHaveValue("1.8"));
-    expect(container.querySelector(".cursor-grab img")).toHaveStyle({ objectPosition: "40% 60%", transform: "scale(1.8)" });
+    expect(container.querySelector(".cursor-grab img")).toHaveStyle({ transform: "translate(40%, -40%) scale(1.8)" });
   });
 });

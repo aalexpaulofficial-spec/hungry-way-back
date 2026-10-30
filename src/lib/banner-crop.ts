@@ -15,12 +15,32 @@ export function normalizeBannerCrop(value?: Partial<BannerCrop> | null): BannerC
   };
 }
 
-export function moveBannerCrop(start: BannerCrop, deltaX: number, deltaY: number, width: number, height: number): Pick<BannerCrop, "x" | "y"> {
+export function moveBannerCrop(start: BannerCrop, deltaX: number, deltaY: number, width: number, height: number): BannerCrop {
   if (width <= 0 || height <= 0 || ![deltaX, deltaY, width, height].every(Number.isFinite)) {
-    return { x: start.x, y: start.y };
+    return normalizeBannerCrop(start);
   }
+  const safeStart = normalizeBannerCrop(start);
+  const startMaxShiftX = ((safeStart.zoom - 1) / 2) * width;
+  const startMaxShiftY = ((safeStart.zoom - 1) / 2) * height;
+  const desiredShiftX = ((50 - safeStart.x) / 50) * startMaxShiftX + deltaX;
+  const desiredShiftY = ((50 - safeStart.y) / 50) * startMaxShiftY + deltaY;
+  const zoom = boundedNumber(Math.max(safeStart.zoom, 1 + (2 * Math.abs(desiredShiftX)) / width, 1 + (2 * Math.abs(desiredShiftY)) / height), safeStart.zoom, 1, 3);
+  const maxShiftX = ((zoom - 1) / 2) * width;
+  const maxShiftY = ((zoom - 1) / 2) * height;
   return {
-    x: boundedNumber(start.x - (deltaX / width) * 100, start.x, 0, 100),
-    y: boundedNumber(start.y - (deltaY / height) * 100, start.y, 0, 100),
+    x: maxShiftX === 0 ? 50 : boundedNumber(50 - (desiredShiftX / maxShiftX) * 50, 50, 0, 100),
+    y: maxShiftY === 0 ? 50 : boundedNumber(50 - (desiredShiftY / maxShiftY) * 50, 50, 0, 100),
+    zoom,
+  };
+}
+
+export function bannerCropStyle(value: Partial<BannerCrop> | null | undefined) {
+  const crop = normalizeBannerCrop(value);
+  const translateX = Number((((50 - crop.x) / 50) * ((crop.zoom - 1) / 2) * 100).toFixed(4));
+  const translateY = Number((((50 - crop.y) / 50) * ((crop.zoom - 1) / 2) * 100).toFixed(4));
+  return {
+    objectPosition: "center",
+    transform: `translate(${translateX}%, ${translateY}%) scale(${crop.zoom})`,
+    transformOrigin: "center",
   };
 }

@@ -42,7 +42,7 @@ export function CanteenTemplatePreview({ imageUrl, heading, description, canteen
           cropX={safeCrop.x}
           cropY={safeCrop.y}
           cropZoom={safeCrop.zoom}
-          onCropChange={({ x, y }) => onCropChange({ ...safeCrop, x, y })}
+          onCropChange={onCropChange}
           preview
         />
       </div>

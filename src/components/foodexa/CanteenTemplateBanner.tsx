@@ -1,5 +1,5 @@
 import { foodImage } from "@/lib/foodexa-images";
-import { moveBannerCrop } from "@/lib/banner-crop";
+import { bannerCropStyle, moveBannerCrop } from "@/lib/banner-crop";
 import { useRef } from "react";
 
 type CanteenTemplateBannerProps = {
@@ -13,7 +13,7 @@ type CanteenTemplateBannerProps = {
   cropX?: number;
   cropY?: number;
   cropZoom?: number;
-  onCropChange?: (crop: { x: number; y: number }) => void;
+  onCropChange?: (crop: { x: number; y: number; zoom: number }) => void;
 };
 
 export function CanteenTemplateBanner({
@@ -60,7 +60,7 @@ export function CanteenTemplateBanner({
       onPointerCancel={() => { drag.current = null; }}
       onLostPointerCapture={() => { drag.current = null; }}
     >
-      <img src={imageUrl || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={{ objectPosition: `${cropX}% ${cropY}%`, transform: `scale(${cropZoom})` }} />
+      <img src={imageUrl || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={bannerCropStyle({ x: cropX, y: cropY, zoom: cropZoom })} />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
       <div className="absolute bottom-5 left-5 right-5">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteenName} · {universityName}</p>

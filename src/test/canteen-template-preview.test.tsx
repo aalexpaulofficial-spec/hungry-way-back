@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { CanteenTemplatePreview } from "@/components/foodexa/CanteenTemplatePreview";
-import { moveBannerCrop, normalizeBannerCrop } from "@/lib/banner-crop";
+import { bannerCropStyle, moveBannerCrop, normalizeBannerCrop } from "@/lib/banner-crop";
 
 afterEach(cleanup);
 
@@ -22,8 +22,12 @@ function PreviewHarness() {
 describe("canteen template crop preview", () => {
   it("normalizes crop values and safely clamps pointer movement", () => {
     expect(normalizeBannerCrop({ x: Number.NaN, y: 110, zoom: 0 })).toEqual({ x: 50, y: 100, zoom: 1 });
-    expect(moveBannerCrop({ x: 50, y: 50, zoom: 1 }, 10, -20, 100, 100)).toEqual({ x: 40, y: 70 });
-    expect(moveBannerCrop({ x: 50, y: 50, zoom: 1 }, 1, 1, 0, 100)).toEqual({ x: 50, y: 50 });
+    const moved = moveBannerCrop({ x: 50, y: 50, zoom: 1 }, 10, -20, 100, 100);
+    expect(moved.x).toBeCloseTo(25);
+    expect(moved.y).toBe(100);
+    expect(moved.zoom).toBeCloseTo(1.4);
+    expect(moveBannerCrop({ x: 50, y: 50, zoom: 1 }, 1, 1, 0, 100)).toEqual({ x: 50, y: 50, zoom: 1 });
+    expect(bannerCropStyle({ x: 25, y: 100, zoom: 1.4 }).transform).toBe("translate(10%, -20%) scale(1.4)");
   });
 
   it("supports all preview sizes, dragging and zoom, and preserves the crop when navigating away and back", () => {
@@ -45,14 +49,13 @@ describe("canteen template crop preview", () => {
     pointer("pointermove", 60, 40);
     pointer("pointerup", 60, 40);
     fireEvent.change(screen.getByRole("slider", { name: "Banner image zoom" }), { target: { value: "1.75" } });
-    expect(screen.getByLabelText("Saved preview crop")).toHaveTextContent("40,60,1.75");
+    expect(screen.getByLabelText("Saved preview crop")).toHaveTextContent("0,100,1.75");
 
     fireEvent.click(screen.getByRole("button", { name: "Menu tab" }));
     fireEvent.click(screen.getByRole("button", { name: "Change Template tab" }));
-    expect(screen.getByLabelText("Saved preview crop")).toHaveTextContent("40,60,1.75");
+    expect(screen.getByLabelText("Saved preview crop")).toHaveTextContent("0,100,1.75");
     const previewImage = container.querySelector(".cursor-grab img") as HTMLImageElement;
-    expect(previewImage.style.objectPosition).toBe("40% 60%");
-    expect(previewImage.style.transform).toBe("scale(1.75)");
+    expect(previewImage.style.transform).toBe("translate(37.5%, -37.5%) scale(1.75)");
     expect(previewImage.src).toBe("https://images.example/banner.jpg");
   });
 });

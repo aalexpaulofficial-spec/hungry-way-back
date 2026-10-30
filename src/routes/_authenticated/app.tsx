@@ -9,6 +9,7 @@ import { CanteenTemplateBanner } from "@/components/foodexa/CanteenTemplateBanne
 import { BackButton, useBackStep } from "@/lib/back-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { foodImage } from "@/lib/foodexa-images";
+import { bannerCropStyle } from "@/lib/banner-crop";
 import { ORDER_LABELS, ORDER_STATUSES, canAcceptOrders, type MenuItem } from "@/lib/access";
 import {
   cancelPendingOrder,
@@ -500,7 +501,7 @@ function HomeTab({ menu, canteen, template, onOpen, onAdd, goMenu }: { menu: Men
   return (
     <div className="space-y-8 pt-2">
       <div className="relative overflow-hidden rounded-[2rem] border border-primary/30">
-        <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={{ objectPosition: `${template?.banner_crop_x ?? 50}% ${template?.banner_crop_y ?? 50}%`, transform: `scale(${template?.banner_crop_zoom ?? 1})` }} />
+        <img src={template?.banner_image_url || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={bannerCropStyle({ x: template?.banner_crop_x, y: template?.banner_crop_y, zoom: template?.banner_crop_zoom })} />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-5 left-5 right-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
