@@ -14,7 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { BackProvider, BackButton } from "../lib/back-nav";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { isStandaloneApp, markAppInstalled } from "../lib/pwa-install";
+import { isStandaloneApp } from "../lib/pwa-install";
 
 function NotFoundComponent() {
   return (
@@ -139,7 +139,6 @@ function RootComponent() {
     setStandaloneApp(standalone || hasAppLaunchMarker);
     const app = appFromUrl;
     if (standalone && (app === "student" || app === "canteen")) {
-      markAppInstalled(app);
       const themeColor = app === "student" ? "#e60012" : "#050505";
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
     }

@@ -4,7 +4,16 @@ export type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-const installedKey = (app: HungryApp) => `hungry-pwa-installed-${app}`;
+type RelatedApp = { id?: string; url?: string; platform?: string };
+type NavigatorWithInstalledApps = Navigator & {
+  getInstalledRelatedApps?: () => Promise<RelatedApp[]>;
+};
+
+const appIdentity: Record<HungryApp, { id: string; manifest: string }> = {
+  student: { id: "/?hungry_app=student", manifest: "/manifest-student.webmanifest" },
+  canteen: { id: "/?hungry_app=canteen", manifest: "/manifest-canteen.webmanifest" },
+};
+
 let deferredInstallPrompt: InstallPromptEvent | null = null;
 const installPromptSubscribers = new Set<() => void>();
 
@@ -31,15 +40,32 @@ export function clearDeferredInstallPrompt(prompt?: InstallPromptEvent) {
   installPromptSubscribers.forEach((subscriber) => subscriber());
 }
 
-export function isAppInstalled(app: HungryApp) {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(installedKey(app)) === "true";
-}
+/**
+ * Returns a fresh browser-reported result. Browsers without the related-apps API
+ * cannot report installs from a normal tab, so those browsers return false and
+ * the UI keeps its download action available.
+ */
+export async function isAppInstalled(app: HungryApp): Promise<boolean> {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
 
-export function markAppInstalled(app: HungryApp) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(installedKey(app), "true");
-  window.dispatchEvent(new Event("hungry-install-status-change"));
+  const currentApp = new URLSearchParams(window.location.search).get("hungry_app");
+  if (isStandaloneApp() && currentApp === app) return true;
+
+  const getInstalledRelatedApps = (navigator as NavigatorWithInstalledApps).getInstalledRelatedApps;
+  if (!getInstalledRelatedApps) return false;
+
+  try {
+    const installedApps = await getInstalledRelatedApps.call(navigator);
+    const identity = appIdentity[app];
+    const manifestUrl = new URL(identity.manifest, window.location.origin).href;
+    const appId = new URL(identity.id, window.location.origin).href;
+    return installedApps.some((installed) => {
+      if (installed.platform !== "webapp") return false;
+      return installed.id === identity.id || installed.id === appId || installed.url === manifestUrl;
+    });
+  } catch {
+    return false;
+  }
 }
 
 export function getInstallInstructions() {

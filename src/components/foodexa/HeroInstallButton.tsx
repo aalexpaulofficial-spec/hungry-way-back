@@ -21,15 +21,26 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
   const label = copy[app];
 
   useEffect(() => {
-    const updateInstalled = () => setInstalled(isAppInstalled(app));
+    let active = true;
+    const updateInstalled = () => {
+      void isAppInstalled(app).then((result) => {
+        if (active) setInstalled(result);
+      });
+    };
+    const updateWhenVisible = () => {
+      if (document.visibilityState === "visible") updateInstalled();
+    };
     updateInstalled();
-    window.addEventListener("storage", updateInstalled);
-    window.addEventListener("hungry-install-status-change", updateInstalled);
+    window.addEventListener("pageshow", updateInstalled);
+    window.addEventListener("focus", updateInstalled);
+    document.addEventListener("visibilitychange", updateWhenVisible);
     const interval = window.setInterval(() => setShowAudience((current) => !current), 4000);
     return () => {
+      active = false;
       window.clearInterval(interval);
-      window.removeEventListener("storage", updateInstalled);
-      window.removeEventListener("hungry-install-status-change", updateInstalled);
+      window.removeEventListener("pageshow", updateInstalled);
+      window.removeEventListener("focus", updateInstalled);
+      document.removeEventListener("visibilitychange", updateWhenVisible);
     };
   }, [app]);
 

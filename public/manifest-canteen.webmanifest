@@ -1,7 +1,7 @@
 {
   "id": "/?hungry_app=canteen",
-  "name": "HUNGRY Canteen Owner App",
-  "short_name": "HUNGRY Canteen",
+  "name": "HUNGRY CANTEEN DASHBOARD",
+  "short_name": "HUNGRY CANTEEN",
   "description": "Register and manage your HUNGRY campus canteen.",
   "start_url": "/register-canteen?hungry_app=canteen",
   "scope": "/",
@@ -9,9 +9,13 @@
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#050505",
   "theme_color": "#050505",
+  "related_applications": [
+    { "platform": "webapp", "id": "https://hungryofficial.vercel.app/?hungry_app=student", "url": "/manifest-student.webmanifest" },
+    { "platform": "webapp", "id": "https://hungryofficial.vercel.app/?hungry_app=canteen", "url": "/manifest-canteen.webmanifest" }
+  ],
   "icons": [
-    { "src": "/pwa-owner-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/pwa-owner-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/pwa-owner-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

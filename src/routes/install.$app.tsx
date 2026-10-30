@@ -6,7 +6,6 @@ import {
   getDeferredInstallPrompt,
   getInstallInstructions,
   isAppInstalled,
-  markAppInstalled,
   subscribeToInstallPrompt,
   type InstallPromptEvent,
   type HungryApp,
@@ -47,10 +46,17 @@ function InstallPage() {
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    const updateInstalled = () => setInstalled(isAppInstalled(app));
+    let active = true;
+    const updateInstalled = () => {
+      void isAppInstalled(app).then((result) => {
+        if (active) setInstalled(result);
+      });
+    };
+    const updateWhenVisible = () => {
+      if (document.visibilityState === "visible") updateInstalled();
+    };
     const confirmInstalled = () => {
       clearDeferredInstallPrompt();
-      markAppInstalled(app);
       setInstalled(true);
       setInstalling(false);
       setMessage("Installation confirmed. You can open the app from your Home Screen or app launcher.");
@@ -62,8 +68,9 @@ function InstallPage() {
     const unsubscribePrompt = subscribeToInstallPrompt(() => {
       setPromptEvent(getDeferredInstallPrompt());
     });
-    window.addEventListener("storage", updateInstalled);
-    window.addEventListener("hungry-install-status-change", updateInstalled);
+    window.addEventListener("pageshow", updateInstalled);
+    window.addEventListener("focus", updateInstalled);
+    document.addEventListener("visibilitychange", updateWhenVisible);
     window.addEventListener("appinstalled", confirmInstalled);
 
     if ("serviceWorker" in navigator) {
@@ -74,8 +81,10 @@ function InstallPage() {
     }
 
     return () => {
-      window.removeEventListener("storage", updateInstalled);
-      window.removeEventListener("hungry-install-status-change", updateInstalled);
+      active = false;
+      window.removeEventListener("pageshow", updateInstalled);
+      window.removeEventListener("focus", updateInstalled);
+      document.removeEventListener("visibilitychange", updateWhenVisible);
       window.removeEventListener("appinstalled", confirmInstalled);
       unsubscribePrompt();
     };
@@ -95,8 +104,10 @@ function InstallPage() {
         setMessage("Installation was cancelled. You can install later from this page or follow the browser instructions below.");
       } else {
         setInstalling(false);
+        const installed = await isAppInstalled(app);
+        setInstalled(installed);
         setMessage(
-          isAppInstalled(app)
+          installed
             ? "Installation confirmed. You can open the app from your Home Screen or app launcher."
             : "The browser accepted the request. Waiting for installation confirmation…",
         );

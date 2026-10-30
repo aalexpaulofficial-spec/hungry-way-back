@@ -13,7 +13,6 @@ import {
   getDeferredInstallPrompt,
   getInstallInstructions,
   isAppInstalled,
-  markAppInstalled,
   subscribeToInstallPrompt,
   type InstallPromptEvent,
 } from "@/lib/pwa-install";
@@ -26,6 +25,7 @@ type InstallManifest = {
   start_url: string;
   scope: string;
   theme_color: string;
+  short_name: string;
   icons: { src: string; type: string; sizes: string }[];
 };
 
@@ -35,6 +35,7 @@ const canteenManifest = JSON.parse(canteenManifestSource) as InstallManifest;
 describe("separate HUNGRY app install flows", () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState({}, "", "/");
   });
 
   afterEach(() => {
@@ -46,28 +47,44 @@ describe("separate HUNGRY app install flows", () => {
 
   it("keeps distinct app identities, launch pages, icons, and theme colours in the shared scope", () => {
     expect(studentManifest.id).not.toBe(canteenManifest.id);
-    expect(studentManifest.name).toContain("Student App");
-    expect(canteenManifest.name).toContain("Canteen Owner App");
+    expect(studentManifest.name).toBe("HUNGRY");
+    expect(studentManifest.short_name).toBe("HUNGRY");
+    expect(canteenManifest.name).toBe("HUNGRY CANTEEN DASHBOARD");
+    expect(canteenManifest.short_name).toBe("HUNGRY CANTEEN");
     expect(studentManifest.start_url).toBe("/auth?hungry_app=student");
     expect(canteenManifest.start_url).toBe("/register-canteen?hungry_app=canteen");
     expect(studentManifest.scope).toBe("/");
     expect(canteenManifest.scope).toBe("/");
     expect(studentManifest.theme_color).not.toBe(canteenManifest.theme_color);
-    expect(studentManifest.icons.map((icon) => icon.src)).not.toEqual(
+    expect(studentManifest.icons.map((icon) => icon.src)).toEqual(
       canteenManifest.icons.map((icon) => icon.src),
     );
     expect(studentManifest.icons.some((icon) => icon.sizes === "192x192")).toBe(true);
     expect(canteenManifest.icons.some((icon) => icon.sizes === "512x512")).toBe(true);
   });
 
-  it("persists install status independently for student and canteen apps", () => {
-    expect(isAppInstalled("student")).toBe(false);
-    expect(isAppInstalled("canteen")).toBe(false);
+  it("uses a fresh related-apps result to detect each app independently", async () => {
+    const getInstalledRelatedApps = vi.fn().mockResolvedValue([
+      { platform: "webapp", id: `${window.location.origin}/?hungry_app=student` },
+    ]);
+    Object.defineProperty(navigator, "getInstalledRelatedApps", {
+      configurable: true,
+      value: getInstalledRelatedApps,
+    });
 
-    markAppInstalled("student");
+    await expect(isAppInstalled("student")).resolves.toBe(true);
+    await expect(isAppInstalled("canteen")).resolves.toBe(false);
+    expect(getInstalledRelatedApps).toHaveBeenCalledTimes(2);
+    expect(localStorage.length).toBe(0);
+  });
 
-    expect(isAppInstalled("student")).toBe(true);
-    expect(isAppInstalled("canteen")).toBe(false);
+  it("does not claim an app is installed when the browser cannot report installation state", async () => {
+    Object.defineProperty(navigator, "getInstalledRelatedApps", {
+      configurable: true,
+      value: undefined,
+    });
+    await expect(isAppInstalled("student")).resolves.toBe(false);
+    await expect(isAppInstalled("canteen")).resolves.toBe(false);
   });
 
   it("captures the browser install event before the install page hydrates", () => {
@@ -97,7 +114,13 @@ describe("separate HUNGRY app install flows", () => {
     expect(getInstallInstructions()).toContain(instruction);
   });
 
-  it("alternates the student button copy every four seconds and shows installed state", () => {
+  it("alternates student button copy and refreshes installed state from the browser", async () => {
+    Object.defineProperty(navigator, "getInstalledRelatedApps", {
+      configurable: true,
+      value: vi.fn().mockResolvedValue([
+        { platform: "webapp", id: `${window.location.origin}/?hungry_app=student` },
+      ]),
+    });
     let tick: (() => void) | undefined;
     vi.spyOn(window, "setInterval").mockImplementation((handler, delay) => {
       expect(delay).toBe(4000);
@@ -111,7 +134,10 @@ describe("separate HUNGRY app install flows", () => {
     act(() => tick?.());
     expect(screen.getByText("For Students, Faculty & Guests")).toBeInTheDocument();
 
-    act(() => markAppInstalled("student"));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(screen.getByText("Already Installed")).toBeInTheDocument();
   });
 
