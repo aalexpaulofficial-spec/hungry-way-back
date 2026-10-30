@@ -10,6 +10,7 @@ import { ensureWelcomeEmail } from "@/lib/hungry.functions";
 import { backendConfigured } from "@/lib/backend-config";
 import { SetupNotice } from "@/components/SetupNotice";
 import { Eye, EyeOff } from "lucide-react";
+import { useBackNavigationEnabled } from "@/lib/back-nav";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: z.object({ mode: z.enum(["login", "signup"]).optional() }),
@@ -32,6 +33,7 @@ const field =
 function AuthPage() {
   const { mode: initial } = Route.useSearch();
   const [mode, setMode] = useState<"login" | "signup">(initial ?? "signup");
+  const standaloneApp = !useBackNavigationEnabled();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,14 +45,22 @@ function AuthPage() {
 
   if (!backendConfigured) return <SetupNotice />;
 
+  const brand = (
+    <>
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[13px] font-black text-primary-foreground">H</span>
+      <span className="display text-[15px] tracking-[0.3em]">HUNGRY</span>
+    </>
+  );
+
   return (
     <div className="grain relative min-h-screen overflow-hidden bg-background px-4 py-10">
       <div className="ember anim-pulse-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2" />
       <div className="relative mx-auto w-full max-w-md">
-        <a href="/" className="mb-8 flex items-center justify-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[13px] font-black text-primary-foreground">H</span>
-          <span className="display text-[15px] tracking-[0.3em]">HUNGRY</span>
-        </a>
+        {standaloneApp ? (
+          <div aria-label="HUNGRY" className="mb-8 flex items-center justify-center gap-2.5">{brand}</div>
+        ) : (
+          <a href="/" className="mb-8 flex items-center justify-center gap-2.5">{brand}</a>
+        )}
 
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <div className="mb-6 grid grid-cols-2 rounded-full bg-ink p-1">

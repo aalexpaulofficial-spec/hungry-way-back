@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getBackFallbackPath, navigateBack } from "@/lib/back-nav";
+import { render, screen } from "@testing-library/react";
+import { createElement } from "react";
+
+vi.mock("@tanstack/react-router", () => ({
+  useLocation: () => ({ pathname: "/app", searchStr: "" }),
+  useRouter: () => ({}),
+}));
+
+import { BackButton, BackProvider, getBackFallbackPath, navigateBack, useBackNavigationEnabled, useBackStep } from "@/lib/back-nav";
 
 describe("shared back navigation", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -42,5 +50,30 @@ describe("shared back navigation", () => {
     expect(step).toHaveBeenCalledOnce();
     expect(router.history.back).not.toHaveBeenCalled();
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it("disables back navigation and back-step registration for installed app shells", () => {
+    function BackNavigationProbe() {
+      useBackStep(true, vi.fn());
+      return createElement("span", null, useBackNavigationEnabled() ? "enabled" : "disabled");
+    }
+
+    render(
+      createElement(
+        BackProvider,
+        { disabled: true },
+        createElement(BackButton),
+        createElement(BackNavigationProbe),
+      ),
+    );
+
+    expect(screen.getByText("disabled")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go back" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the website back button enabled by default", () => {
+    render(createElement(BackProvider, null, createElement(BackButton)));
+
+    expect(screen.getByRole("button", { name: "Go back" })).toBeInTheDocument();
   });
 });

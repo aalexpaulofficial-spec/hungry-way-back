@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BackButton, useBackStep } from "@/lib/back-nav";
+import { BackButton, useBackNavigationEnabled, useBackStep } from "@/lib/back-nav";
 import { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -16,6 +16,7 @@ import { backendConfigured } from "@/lib/backend-config";
 import { SetupNotice } from "@/components/SetupNotice";
 import { CanteenOwnerLoginForm } from "@/components/foodexa/CanteenOwnerLoginForm";
 import { LanguageSelect, localizeDashboard, useDashboardLanguage } from "@/lib/dashboard-language";
+import { isStandaloneApp } from "@/lib/pwa-install";
 
 export const Route = createFileRoute("/canteen")({
   ssr: false,
@@ -40,6 +41,7 @@ type Canteen = { id: string; code: string; name: string; university_name: string
 
 function CanteenPage() {
   const ownerAccess = useServerFn(getCanteenOwnerAccess);
+  const siteNavigationEnabled = useBackNavigationEnabled();
   const [state, setState] = useState<"loading" | "auth" | "ok" | "pending" | "rejected" | "missing" | "error">("loading");
   const [canteen, setCanteen] = useState<Canteen | null>(null);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
@@ -102,13 +104,19 @@ function CanteenPage() {
     <div className="grain relative min-h-screen overflow-hidden bg-background px-4 py-10">
       <div className="ember anim-pulse-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2" />
       <div className="relative mx-auto w-full max-w-md">
-        <Link to="/" className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY home">HUNGRY</Link>
+        {siteNavigationEnabled ? (
+          <Link to="/" className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY home">HUNGRY</Link>
+        ) : (
+          <span className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY">HUNGRY</span>
+        )}
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">Canteen Dashboard</p>
           {state === "auth" ? (
             <div className="mt-4 space-y-4">
               <h1 className="display text-2xl">Canteen Owner Login</h1>
-              <CanteenOwnerLoginForm initialError={err} onRegister={() => { window.location.href = "/register-canteen"; }} />
+              <CanteenOwnerLoginForm initialError={err} onRegister={() => {
+                window.location.href = isStandaloneApp() ? "/register-canteen?hungry_app=canteen" : "/register-canteen";
+              }} />
             </div>
           ) : state === "pending" || state === "rejected" || state === "missing" ? (
             <div className="mt-4 space-y-4">

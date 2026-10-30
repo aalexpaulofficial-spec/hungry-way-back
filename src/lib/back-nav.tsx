@@ -10,14 +10,15 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
  * - Typed form values are saved per page in sessionStorage and restored on return.
  */
 type Step = { id: number; fn: () => void };
-type Ctx = { push: (s: Step) => void; remove: (id: number) => void; stack: React.MutableRefObject<Step[]>; inline: number; setInline: React.Dispatch<React.SetStateAction<number>> };
+type Ctx = { enabled: boolean; push: (s: Step) => void; remove: (id: number) => void; stack: React.MutableRefObject<Step[]>; inline: number; setInline: React.Dispatch<React.SetStateAction<number>> };
 const BackCtx = createContext<Ctx | null>(null);
 let nextId = 1;
 
-export function BackProvider({ children }: { children: ReactNode }) {
+export function BackProvider({ children, disabled = false }: { children: ReactNode; disabled?: boolean }) {
   const stack = useRef<Step[]>([]);
   const [inline, setInline] = useState(0);
   const value = {
+    enabled: !disabled,
     stack,
     inline,
     setInline,
@@ -34,11 +35,15 @@ export function useBackStep(active: boolean, onBack: () => void) {
   const idRef = useRef(0);
   if (!idRef.current) idRef.current = nextId++;
   useEffect(() => {
-    if (!ctx || !active) return;
+    if (!ctx || !ctx.enabled || !active) return;
     const id = idRef.current;
     ctx.push({ id, fn: () => fnRef.current() });
     return () => ctx.remove(id);
   }, [ctx, active]);
+}
+
+export function useBackNavigationEnabled() {
+  return useContext(BackCtx)?.enabled ?? true;
 }
 
 export function getBackFallbackPath(pathname: string) {
@@ -75,12 +80,13 @@ export function BackButton({ inline = false }: { inline?: boolean }) {
   const router = useRouter();
   const { pathname } = useLocation();
   const setInline = ctx?.setInline;
+  const enabled = ctx?.enabled ?? true;
   useEffect(() => {
-    if (!inline || !setInline) return;
+    if (!inline || !setInline || !enabled) return;
     setInline((n) => n + 1);
     return () => setInline((n) => n - 1);
-  }, [inline, setInline]);
-  if (pathname === "/") return null;
+  }, [inline, setInline, enabled]);
+  if (ctx?.enabled === false || pathname === "/") return null;
   if (!inline && (ctx?.inline ?? 0) > 0) return null;
   const goBack = () => {
     navigateBack(router, pathname, ctx?.stack.current ?? []);

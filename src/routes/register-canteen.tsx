@@ -2,6 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Navbar } from "@/components/foodexa/Navbar";
 import { Footer } from "@/components/foodexa/Footer";
 import { CanteenSection } from "@/components/foodexa/CanteenSection";
+import { useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { getCanteenOwnerAccess } from "@/lib/hungry.functions";
+import { isStandaloneApp } from "@/lib/pwa-install";
+import { useBackNavigationEnabled } from "@/lib/back-nav";
 
 const title = "Register Your Canteen — HUNGRY";
 const description =
@@ -22,13 +29,38 @@ export const Route = createFileRoute("/register-canteen")({
 });
 
 function RegisterCanteenPage() {
+  const navigate = useNavigate();
+  const getOwnerAccess = useServerFn(getCanteenOwnerAccess);
+  const siteNavigationEnabled = useBackNavigationEnabled();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!isStandaloneApp() || params.get("hungry_app") !== "canteen") return;
+
+    let active = true;
+    void (async () => {
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error || !data.user) return;
+        const access = await getOwnerAccess({ data: {} });
+        if (active && access.linked && access.status === "approved") {
+          navigate({ to: "/canteen", replace: true });
+        }
+      } catch {
+        // Keep the register/login page available if an existing owner session can't be restored.
+      }
+    })();
+
+    return () => { active = false; };
+  }, [getOwnerAccess, navigate]);
+
   return (
     <>
       <Navbar />
       <main>
         <CanteenSection />
       </main>
-      <Footer />
+      {siteNavigationEnabled && <Footer />}
     </>
   );
 }

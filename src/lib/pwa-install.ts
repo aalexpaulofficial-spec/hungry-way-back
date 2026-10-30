@@ -1,6 +1,35 @@
 export type HungryApp = "student" | "canteen";
+export type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 
 const installedKey = (app: HungryApp) => `hungry-pwa-installed-${app}`;
+let deferredInstallPrompt: InstallPromptEvent | null = null;
+const installPromptSubscribers = new Set<() => void>();
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event as InstallPromptEvent;
+    installPromptSubscribers.forEach((subscriber) => subscriber());
+  });
+}
+
+export function getDeferredInstallPrompt() {
+  return deferredInstallPrompt;
+}
+
+export function subscribeToInstallPrompt(subscriber: () => void) {
+  installPromptSubscribers.add(subscriber);
+  return () => installPromptSubscribers.delete(subscriber);
+}
+
+export function clearDeferredInstallPrompt(prompt?: InstallPromptEvent) {
+  if (prompt && deferredInstallPrompt !== prompt) return;
+  deferredInstallPrompt = null;
+  installPromptSubscribers.forEach((subscriber) => subscriber());
+}
 
 export function isAppInstalled(app: HungryApp) {
   if (typeof window === "undefined") return false;

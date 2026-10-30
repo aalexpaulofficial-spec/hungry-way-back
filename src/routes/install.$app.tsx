@@ -2,16 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Download, Smartphone } from "lucide-react";
 import {
+  clearDeferredInstallPrompt,
+  getDeferredInstallPrompt,
   getInstallInstructions,
   isAppInstalled,
   markAppInstalled,
+  subscribeToInstallPrompt,
+  type InstallPromptEvent,
   type HungryApp,
 } from "@/lib/pwa-install";
-
-type InstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
 
 const appDetails = {
   student: {
@@ -41,7 +40,7 @@ function InstallPage() {
   const validApp = appParam === "student" || appParam === "canteen";
   const app = (validApp ? appParam : "student") as HungryApp;
   const details = appDetails[app];
-  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
+  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(getDeferredInstallPrompt);
   const [installed, setInstalled] = useState(false);
   const [message, setMessage] = useState("");
   const [instructions, setInstructions] = useState("Use your browser menu to install this app.");
@@ -49,11 +48,8 @@ function InstallPage() {
 
   useEffect(() => {
     const updateInstalled = () => setInstalled(isAppInstalled(app));
-    const receiveInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setPromptEvent(event as InstallPromptEvent);
-    };
     const confirmInstalled = () => {
+      clearDeferredInstallPrompt();
       markAppInstalled(app);
       setInstalled(true);
       setInstalling(false);
@@ -61,10 +57,13 @@ function InstallPage() {
     };
 
     updateInstalled();
+    setPromptEvent(getDeferredInstallPrompt());
     setInstructions(getInstallInstructions());
+    const unsubscribePrompt = subscribeToInstallPrompt(() => {
+      setPromptEvent(getDeferredInstallPrompt());
+    });
     window.addEventListener("storage", updateInstalled);
     window.addEventListener("hungry-install-status-change", updateInstalled);
-    window.addEventListener("beforeinstallprompt", receiveInstallPrompt);
     window.addEventListener("appinstalled", confirmInstalled);
 
     if ("serviceWorker" in navigator) {
@@ -77,8 +76,8 @@ function InstallPage() {
     return () => {
       window.removeEventListener("storage", updateInstalled);
       window.removeEventListener("hungry-install-status-change", updateInstalled);
-      window.removeEventListener("beforeinstallprompt", receiveInstallPrompt);
       window.removeEventListener("appinstalled", confirmInstalled);
+      unsubscribePrompt();
     };
   }, [app]);
 
@@ -86,14 +85,27 @@ function InstallPage() {
     if (!promptEvent) return;
     setMessage("");
     setInstalling(true);
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
-    setPromptEvent(null);
-    if (choice.outcome === "dismissed") {
+    try {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      clearDeferredInstallPrompt(promptEvent);
+      setPromptEvent(null);
+      if (choice.outcome === "dismissed") {
+        setInstalling(false);
+        setMessage("Installation was cancelled. You can install later from this page or follow the browser instructions below.");
+      } else {
+        setInstalling(false);
+        setMessage(
+          isAppInstalled(app)
+            ? "Installation confirmed. You can open the app from your Home Screen or app launcher."
+            : "The browser accepted the request. Waiting for installation confirmation…",
+        );
+      }
+    } catch {
       setInstalling(false);
-      setMessage("Installation was cancelled. You can install later from this page or follow the browser instructions below.");
-    } else {
-      setMessage("The browser accepted the request. Waiting for installation confirmation…");
+      clearDeferredInstallPrompt(promptEvent);
+      setPromptEvent(null);
+      setMessage("The browser could not start installation. Follow the Add to Home Screen instructions below.");
     }
   }
 

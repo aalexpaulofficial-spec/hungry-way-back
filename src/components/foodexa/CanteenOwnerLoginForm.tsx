@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { loginCanteenOwner } from "@/lib/hungry.functions";
+import { isStandaloneApp } from "@/lib/pwa-install";
 
 const field = "w-full rounded-2xl border border-input bg-ink-soft px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none transition focus:border-primary";
 
@@ -26,7 +27,7 @@ export function CanteenOwnerLoginForm({ initialError = "", onRegister, submitLab
         refresh_token: session.refreshToken,
       });
       if (authError) throw new Error(authError.message);
-      window.location.assign("/canteen");
+      window.location.assign(isStandaloneApp() ? "/canteen?hungry_app=canteen" : "/canteen");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not verify your owner login. Please try again.");
     } finally {

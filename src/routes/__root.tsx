@@ -2,13 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
+  useLocation,
   createRootRouteWithContext,
   useRouter,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { BackProvider, BackButton } from "../lib/back-nav";
@@ -128,20 +129,26 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { searchStr } = useLocation();
+  const appFromUrl = new URLSearchParams(searchStr).get("hungry_app");
+  const hasAppLaunchMarker = appFromUrl === "student" || appFromUrl === "canteen";
+  const [standaloneApp, setStandaloneApp] = useState(hasAppLaunchMarker);
 
   useEffect(() => {
-    const app = new URLSearchParams(window.location.search).get("hungry_app");
-    if (isStandaloneApp() && (app === "student" || app === "canteen")) {
+    const standalone = isStandaloneApp();
+    setStandaloneApp(standalone || hasAppLaunchMarker);
+    const app = appFromUrl;
+    if (standalone && (app === "student" || app === "canteen")) {
       markAppInstalled(app);
       const themeColor = app === "student" ? "#e60012" : "#050505";
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
     }
-  }, []);
+  }, [appFromUrl, hasAppLaunchMarker]);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <BackProvider>
+      <BackProvider disabled={standaloneApp}>
         <BackButton />
         <Outlet />
       </BackProvider>

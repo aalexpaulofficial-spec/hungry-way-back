@@ -8,7 +8,15 @@ vi.mock("motion/react", () => ({
 }));
 
 import { HeroInstallButton } from "@/components/foodexa/HeroInstallButton";
-import { isAppInstalled, markAppInstalled } from "@/lib/pwa-install";
+import {
+  clearDeferredInstallPrompt,
+  getDeferredInstallPrompt,
+  getInstallInstructions,
+  isAppInstalled,
+  markAppInstalled,
+  subscribeToInstallPrompt,
+  type InstallPromptEvent,
+} from "@/lib/pwa-install";
 import studentManifestSource from "../../public/manifest-student.webmanifest?raw";
 import canteenManifestSource from "../../public/manifest-canteen.webmanifest?raw";
 
@@ -31,7 +39,9 @@ describe("separate HUNGRY app install flows", () => {
 
   afterEach(() => {
     cleanup();
+    clearDeferredInstallPrompt();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("keeps distinct app identities, launch pages, icons, and theme colours in the shared scope", () => {
@@ -58,6 +68,33 @@ describe("separate HUNGRY app install flows", () => {
 
     expect(isAppInstalled("student")).toBe(true);
     expect(isAppInstalled("canteen")).toBe(false);
+  });
+
+  it("captures the browser install event before the install page hydrates", () => {
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
+    }) as InstallPromptEvent;
+    const update = vi.fn();
+    const unsubscribe = subscribeToInstallPrompt(update);
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(getDeferredInstallPrompt()).toBe(event);
+    expect(update).toHaveBeenCalledOnce();
+    clearDeferredInstallPrompt(event);
+    expect(getDeferredInstallPrompt()).toBeNull();
+    unsubscribe();
+  });
+
+  it.each([
+    ["Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1", "Tap Share, then Add to Home Screen."],
+    ["Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36", "Open the ⋮ menu and choose Install app"],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36", "install icon in the address bar"],
+  ])("provides device-specific install instructions for %s", (userAgent, instruction) => {
+    vi.stubGlobal("navigator", { userAgent, platform: "", maxTouchPoints: 0 });
+    expect(getInstallInstructions()).toContain(instruction);
   });
 
   it("alternates the student button copy every four seconds and shows installed state", () => {

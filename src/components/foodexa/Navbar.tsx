@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { BackButton } from "@/lib/back-nav";
+import { BackButton, useBackNavigationEnabled } from "@/lib/back-nav";
 
 const links = [
   { label: "For Students", href: "#students" },
@@ -16,6 +16,7 @@ const links = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const siteNavigationEnabled = useBackNavigationEnabled();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -31,6 +32,22 @@ export function Navbar() {
     };
   }, [open]);
 
+  const brand = (
+    <>
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-[12px] font-black text-primary-foreground shadow-[0_0_24px_-4px_var(--primary)]">
+        H
+      </span>
+      <span
+        className={cn(
+          "display tracking-[0.3em] transition-all duration-500",
+          scrolled ? "text-[12px]" : "text-[14px]",
+        )}
+      >
+        HUNGRY
+      </span>
+    </>
+  );
+
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 sm:px-5 sm:pt-5">
@@ -43,65 +60,67 @@ export function Navbar() {
           )}
         >
           <div className="flex min-w-0 items-center gap-3">
-          <BackButton inline />
-          <a href="#top" className="group flex min-w-0 items-center gap-2.5">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-[12px] font-black text-primary-foreground shadow-[0_0_24px_-4px_var(--primary)]">
-              H
-            </span>
-            <span
-              className={cn(
-                "display tracking-[0.3em] transition-all duration-500",
-                scrolled ? "text-[12px]" : "text-[14px]",
-              )}
-            >
-              HUNGRY
-            </span>
-          </a>
+            {siteNavigationEnabled && <BackButton inline />}
+            {siteNavigationEnabled ? (
+              <a href="#top" className="group flex min-w-0 items-center gap-2.5">
+                {brand}
+              </a>
+            ) : (
+              <span className="group flex min-w-0 items-center gap-2.5" aria-label="HUNGRY">
+                {brand}
+              </span>
+            )}
           </div>
 
-          <div className="hidden items-center gap-1 lg:flex">
-            {links.map((l) => (
-              <a
-                key={l.label}
-                href={l.href}
-                className="whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors duration-300 hover:text-foreground"
-              >
-                {l.label}
-              </a>
-            ))}
-          </div>
+          {siteNavigationEnabled && (
+            <div className="hidden items-center gap-1 lg:flex">
+              {links.map((l) => (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  className="whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors duration-300 hover:text-foreground"
+                >
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
-            <a
-              href="/register-canteen"
-              className="group hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/60 bg-background px-4 py-2 text-[12px] font-semibold text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:inline-flex"
-            >
-              Register & Login Canteen
-            </a>
-            <a
-              href="/auth"
-              className="group hidden items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-4 py-2 text-[12px] font-semibold text-primary-foreground transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:inline-flex"
-            >
-              Start with HUNGRY
-              <span className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-                ↗
-              </span>
-            </a>
-            <button
-              type="button"
-              aria-label="Open menu"
-              onClick={() => setOpen(true)}
-              className="flex h-10 w-10 flex-col items-center justify-center gap-[5px] rounded-full border border-border lg:hidden"
-            >
-              <span className="h-[1.5px] w-4 bg-foreground" />
-              <span className="h-[1.5px] w-4 bg-foreground" />
-            </button>
+            {siteNavigationEnabled && (
+              <>
+                <a
+                  href="/register-canteen"
+                  className="group hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/60 bg-background px-4 py-2 text-[12px] font-semibold text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:inline-flex"
+                >
+                  Register & Login Canteen
+                </a>
+                <a
+                  href="/auth"
+                  className="group hidden items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-4 py-2 text-[12px] font-semibold text-primary-foreground transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:inline-flex"
+                >
+                  Start with HUNGRY
+                  <span className="transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                    ↗
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  aria-label="Open menu"
+                  onClick={() => setOpen(true)}
+                  className="flex h-10 w-10 flex-col items-center justify-center gap-[5px] rounded-full border border-border lg:hidden"
+                >
+                  <span className="h-[1.5px] w-4 bg-foreground" />
+                  <span className="h-[1.5px] w-4 bg-foreground" />
+                </button>
+              </>
+            )}
           </div>
         </nav>
       </header>
 
       <AnimatePresence>
-        {open && (
+        {siteNavigationEnabled && open && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
