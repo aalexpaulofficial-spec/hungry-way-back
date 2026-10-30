@@ -1,4 +1,5 @@
 import { foodImage } from "@/lib/foodexa-images";
+import { moveBannerCrop } from "@/lib/banner-crop";
 import { useRef } from "react";
 
 type CanteenTemplateBannerProps = {
@@ -37,18 +38,27 @@ export function CanteenTemplateBanner({
         if (!onCropChange || !preview) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         drag.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, cropX, cropY, width: bounds.width, height: bounds.height };
-        event.currentTarget.setPointerCapture(event.pointerId);
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Some browsers do not support pointer capture for every pointer type.
+          // Dragging still works while the pointer remains over the preview.
+        }
       }}
       onPointerMove={(event) => {
         const start = drag.current;
         if (!start || start.pointerId !== event.pointerId || !onCropChange) return;
-        onCropChange({
-          x: Math.max(0, Math.min(100, start.cropX - ((event.clientX - start.startX) / start.width) * 100)),
-          y: Math.max(0, Math.min(100, start.cropY - ((event.clientY - start.startY) / start.height) * 100)),
-        });
+        onCropChange(moveBannerCrop(
+          { x: start.cropX, y: start.cropY, zoom: cropZoom },
+          event.clientX - start.startX,
+          event.clientY - start.startY,
+          start.width,
+          start.height,
+        ));
       }}
       onPointerUp={(event) => { if (drag.current?.pointerId === event.pointerId) drag.current = null; }}
       onPointerCancel={() => { drag.current = null; }}
+      onLostPointerCapture={() => { drag.current = null; }}
     >
       <img src={imageUrl || foodImage("food-indian")} alt="" className="h-52 w-full object-cover opacity-70" style={{ objectPosition: `${cropX}% ${cropY}%`, transform: `scale(${cropZoom})` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />

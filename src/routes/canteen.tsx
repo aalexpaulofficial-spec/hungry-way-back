@@ -5,7 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { LogOut, Plus, Trash2, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { CanteenTemplateBanner } from "@/components/foodexa/CanteenTemplateBanner";
+import { CanteenTemplatePreview } from "@/components/foodexa/CanteenTemplatePreview";
+import { DEFAULT_BANNER_CROP, normalizeBannerCrop } from "@/lib/banner-crop";
 import { createCanteenMenuImageUpload, getCanteenOwnerAccess, ownerUpdateOrderStatus } from "@/lib/hungry.functions";
 import { ORDER_TYPE_LABELS, PAYMENT_STATUS_LABELS, type OrderType } from "@/lib/order-rules";
 import { ORDER_LABELS, type MenuItem } from "@/lib/access";
@@ -132,6 +133,19 @@ function CanteenPage() {
 
 type Order = { id: string; order_number: string; customer_name: string; lines: { name: string; qty: number }[]; total: number; discount: number; pickup_code: string; status: string; created_at: string; order_type: string; payment_method: string; payment_status: string };
 type CanteenTemplate = { canteen_id: string; banner_image_url: string | null; heading: string; description: string; banner_crop_x: number; banner_crop_y: number; banner_crop_zoom: number; updated_at?: string };
+function normalizeCanteenTemplate(value: Partial<CanteenTemplate> | null | undefined, canteenId: string): CanteenTemplate {
+  const crop = normalizeBannerCrop({ x: value?.banner_crop_x, y: value?.banner_crop_y, zoom: value?.banner_crop_zoom });
+  return {
+    canteen_id: value?.canteen_id ?? canteenId,
+    banner_image_url: value?.banner_image_url ?? null,
+    heading: value?.heading ?? "",
+    description: value?.description ?? "",
+    banner_crop_x: crop.x,
+    banner_crop_y: crop.y,
+    banner_crop_zoom: crop.zoom,
+    ...(value?.updated_at ? { updated_at: value.updated_at } : {}),
+  };
+}
 const uid = () => Math.random().toString(36).slice(2);
 const NEXT: Record<string, string | undefined> = { placed: "preparing", preparing: "ready", ready: "collected" };
 const BANNER_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
@@ -149,8 +163,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
   const [templatePreview, setTemplatePreview] = useState<string | null>(null);
   const [templateError, setTemplateError] = useState("");
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [bannerCrop, setBannerCrop] = useState({ x: 50, y: 50, zoom: 1 });
-  const [bannerPreviewSize, setBannerPreviewSize] = useState<"mobile" | "tablet" | "laptop">("laptop");
+  const [bannerCrop, setBannerCrop] = useState(DEFAULT_BANNER_CROP);
   useBackStep(tab !== "menu", () => setTab("menu"));
   useBackStep(!!editing, () => setEditing(null));
   const [err, setErr] = useState("");
@@ -202,11 +215,11 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         setTemplateError("Could not load the canteen template. Apply database/007_canteen_template_crop.sql after the earlier migrations and try again.");
         return;
       }
-      const loadedTemplate = data ?? { canteen_id: canteen.id, banner_image_url: null, heading: "", description: "", banner_crop_x: 50, banner_crop_y: 50, banner_crop_zoom: 1 };
+      const loadedTemplate = normalizeCanteenTemplate(data, canteen.id);
       setTemplate(loadedTemplate);
       setTemplateHeading(loadedTemplate.heading);
       setTemplateDescription(loadedTemplate.description);
-      setBannerCrop({ x: loadedTemplate.banner_crop_x, y: loadedTemplate.banner_crop_y, zoom: loadedTemplate.banner_crop_zoom });
+      setBannerCrop(normalizeBannerCrop({ x: loadedTemplate.banner_crop_x, y: loadedTemplate.banner_crop_y, zoom: loadedTemplate.banner_crop_zoom }));
       setTemplateError("");
     };
     loadMenu();
@@ -257,14 +270,22 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         .select("canteen_id,banner_image_url,heading,description,banner_crop_x,banner_crop_y,banner_crop_zoom,updated_at")
         .single();
       if (error || !data) throw new Error(error?.message || "Could not save the canteen template.");
-      setTemplate(data);
-      setTemplateHeading(data.heading);
-      setTemplateDescription(data.description);
-      setBannerCrop({ x: data.banner_crop_x, y: data.banner_crop_y, zoom: data.banner_crop_zoom });
+      const savedTemplate = normalizeCanteenTemplate(data, canteen.id);
+      setTemplate(savedTemplate);
+      setTemplateHeading(savedTemplate.heading);
+      setTemplateDescription(savedTemplate.description);
+      setBannerCrop(normalizeBannerCrop({ x: savedTemplate.banner_crop_x, y: savedTemplate.banner_crop_y, zoom: savedTemplate.banner_crop_zoom }));
       setTemplateImage(null);
       setTab("menu");
     } catch (error) {
-      if (uploadedPath) await supabase.storage.from("canteen-home-banners").remove([uploadedPath]);
+      if (uploadedPath) {
+        try {
+          const { error: cleanupError } = await supabase.storage.from("canteen-home-banners").remove([uploadedPath]);
+          if (cleanupError) console.warn("Could not remove the unused banner upload", cleanupError);
+        } catch (cleanupError) {
+          console.warn("Could not remove the unused banner upload", cleanupError);
+        }
+      }
       setTemplateError(error instanceof Error ? error.message : "Could not save the canteen template.");
     } finally {
       setSavingTemplate(false);
@@ -352,7 +373,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
         {canteen.visibility === "maintenance" && <p className="mt-4 rounded-2xl border border-primary/40 bg-primary/10 p-3 text-sm text-primary-bright">Your canteen is in maintenance mode — customers can't place orders.</p>}
         <div className="mt-6 flex gap-2">
           {([['menu', `Menu (${menu.length})`], ['orders', `Live Orders (${orders.filter((o) => o.status !== "collected" && o.status !== "cancelled").length})`], ['template', "Change Template"]] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} className={cn("rounded-full border px-4 py-2 text-xs font-semibold", tab === k ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{l}</button>
+            <button key={k} type="button" onClick={() => setTab(k)} className={cn("rounded-full border px-4 py-2 text-xs font-semibold", tab === k ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>{l}</button>
           ))}
         </div>
 
@@ -394,39 +415,14 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                 aria-label="Choose canteen banner image"
                 onChange={(event) => {
                   setTemplateImage(event.currentTarget.files?.[0] ?? null);
-                  setBannerCrop({ x: 50, y: 50, zoom: 1 });
+                  setBannerCrop(DEFAULT_BANNER_CROP);
                 }}
                 className={cn(field, "file:mr-3 file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-foreground")}
               />
             </label>
             <input name="templateHeading" maxLength={120} value={templateHeading} onChange={(event) => setTemplateHeading(event.currentTarget.value)} placeholder="Heading (optional)" className={field} />
             <textarea name="templateDescription" maxLength={500} value={templateDescription} onChange={(event) => setTemplateDescription(event.currentTarget.value)} placeholder="Description (optional)" rows={3} className={field} />
-            <div>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-foreground">Preview · drag image to reposition</p>
-                <div className="flex gap-1" aria-label="Banner preview size">
-                  {(["mobile", "tablet", "laptop"] as const).map((size) => <button key={size} type="button" onClick={() => setBannerPreviewSize(size)} aria-pressed={bannerPreviewSize === size} className={cn("rounded-full border px-3 py-1 text-[10px] capitalize", bannerPreviewSize === size ? "border-primary bg-primary/15 text-primary-bright" : "border-border text-muted-foreground")}>{size}</button>)}
-                </div>
-              </div>
-              <div className="mx-auto w-full transition-[max-width]" style={{ maxWidth: bannerPreviewSize === "mobile" ? 360 : bannerPreviewSize === "tablet" ? 640 : 900 }}>
-                <CanteenTemplateBanner
-                  imageUrl={templatePreview ?? template.banner_image_url}
-                  heading={templateHeading}
-                  description={templateDescription}
-                  canteenName={canteen.name}
-                  universityName={canteen.university_name}
-                  cropX={bannerCrop.x}
-                  cropY={bannerCrop.y}
-                  cropZoom={bannerCrop.zoom}
-                  onCropChange={({ x, y }) => setBannerCrop((crop) => ({ ...crop, x, y }))}
-                  preview
-                />
-              </div>
-              <label className="mt-3 block space-y-1.5 text-xs text-muted-foreground">
-                <span className="flex justify-between"><span>Zoom</span><span>{bannerCrop.zoom.toFixed(2)}×</span></span>
-                <input type="range" min="1" max="3" step="0.05" value={bannerCrop.zoom} onChange={(event) => setBannerCrop((crop) => ({ ...crop, zoom: Number(event.currentTarget.value) }))} aria-label="Banner image zoom" className="w-full accent-primary" />
-              </label>
-            </div>
+            <CanteenTemplatePreview imageUrl={templatePreview ?? template.banner_image_url} heading={templateHeading} description={templateDescription} canteenName={canteen.name} universityName={canteen.university_name} crop={bannerCrop} onCropChange={setBannerCrop} />
             {templateError && <p role="alert" className="text-sm text-primary-bright">{templateError}</p>}
             <div className="flex gap-2">
               <button disabled={savingTemplate} className="rounded-full bg-primary px-6 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">{savingTemplate ? "Saving template…" : "Save template"}</button>
