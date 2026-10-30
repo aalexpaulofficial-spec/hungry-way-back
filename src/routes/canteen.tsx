@@ -206,32 +206,38 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
     if (!row.name || !Number.isFinite(row.price) || row.price < 0) return setErr("Enter a name and a valid price.");
     if (row.stock !== null && !Number.isFinite(row.stock)) return setErr("Stock must be a number, or empty for unlimited.");
     let uploadedPath: string | null = null;
-    if (foodImageFile) {
-      const mimeToExtension: Record<string, string> = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/webp": "webp",
-        "image/avif": "avif",
-      };
-      const extension = mimeToExtension[foodImageFile.type];
-      if (!extension) return setErr("Choose a JPG, PNG, WEBP, or AVIF food image.");
-      if (foodImageFile.size > 8 * 1024 * 1024) return setErr("Food images must be 8 MB or smaller.");
-      uploadedPath = `${canteen.id}/${crypto.randomUUID()}.${extension}`;
-      const storage = supabase.storage.from("canteen-menu-images");
-      const { error: uploadError } = await storage.upload(uploadedPath, foodImageFile, {
-        cacheControl: "3600",
-        contentType: foodImageFile.type,
-        upsert: false,
-      });
-      if (uploadError) return setErr("Could not upload food image.");
-      row.image = storage.getPublicUrl(uploadedPath).data.publicUrl;
-    }
-    const { error } = editing?.id
-      ? await supabase.from("menu_items").update(row).eq("id", editing.id)
-      : await supabase.from("menu_items").insert(row);
-    if (error) {
+    try {
+      if (foodImageFile) {
+        const mimeToExtension: Record<string, string> = {
+          "image/jpeg": "jpg",
+          "image/png": "png",
+          "image/webp": "webp",
+          "image/avif": "avif",
+        };
+        const extension = mimeToExtension[foodImageFile.type];
+        if (!extension) return setErr("Choose a JPG, PNG, WEBP, or AVIF food image.");
+        if (foodImageFile.size > 8 * 1024 * 1024) return setErr("Food images must be 8 MB or smaller.");
+        uploadedPath = `${canteen.id}/${crypto.randomUUID()}.${extension}`;
+        const storage = supabase.storage.from("canteen-menu-images");
+        const { error: uploadError } = await storage.upload(uploadedPath, foodImageFile, {
+          cacheControl: "3600",
+          contentType: foodImageFile.type,
+          upsert: false,
+        });
+        if (uploadError) throw new Error(`Could not upload the food image: ${uploadError.message}`);
+        row.image = storage.getPublicUrl(uploadedPath).data.publicUrl;
+      }
+      const result = editing?.id
+        ? await supabase.from("menu_items").update(row).eq("id", editing.id).select().single()
+        : await supabase.from("menu_items").insert(row).select().single();
+      if (result.error) throw new Error(`Could not save the menu item: ${result.error.message}`);
+      const savedItem = result.data as MenuItem;
+      setMenu((current) => editing?.id
+        ? current.map((item) => item.id === savedItem.id ? savedItem : item)
+        : [...current, savedItem]);
+    } catch (e) {
       if (uploadedPath) await supabase.storage.from("canteen-menu-images").remove([uploadedPath]);
-      return setErr("Could not save item.");
+      return setErr(e instanceof Error ? e.message : "Could not save the menu item. Please try again.");
     }
     setEditing(null);
     setFoodImageFile(null);
@@ -310,7 +316,7 @@ function Dashboard({ canteen, onSignOut }: { canteen: Canteen; onSignOut: () => 
                     }}
                     className={cn(field, "file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground")}
                   />
-                  {foodImagePreview && <img src={foodImagePreview} alt="Selected food image preview" className="h-32 w-32 rounded-2xl border border-border object-cover" />}
+                  {(foodImagePreview || editing.image) && <img src={foodImagePreview ?? foodImage(editing.image)} alt={foodImagePreview ? "Selected food image preview" : "Current food image"} className="h-32 w-32 rounded-2xl border border-border object-cover" />}
                   <p className="text-xs text-muted-foreground">Choose a JPG, PNG, WEBP, or AVIF image (up to 8 MB).</p>
                 </div>
                 <div className="flex items-center gap-5 text-sm">
