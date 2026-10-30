@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useServerFn } from "@tanstack/react-start";
-import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store, Sparkles } from "lucide-react";
+import { Home, UtensilsCrossed, Receipt, User, Plus, Minus, ShoppingBag, Clock, X, Check, LogOut, Repeat, MapPin, Store } from "lucide-react";
+import { LogoMark } from "@/components/foodexa/LogoMark";
 import { BackButton, useBackStep } from "@/lib/back-nav";
 import { supabase } from "@/integrations/supabase/client";
 import { foodImage } from "@/lib/foodexa-images";
@@ -844,9 +845,9 @@ function CollectionCelebration({ onContinue }: { onContinue: () => void }) {
         <motion.div
           animate={{ rotate: [0, -7, 7, 0], scale: [1, 1.06, 1] }}
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-          className="relative mx-auto grid h-16 w-16 place-items-center rounded-2xl border border-primary/40 bg-primary/10 text-primary-bright"
+          className="relative mx-auto"
         >
-          <Sparkles className="h-8 w-8" />
+          <LogoMark className="h-16 w-16 text-2xl" />
         </motion.div>
         <p className="relative mt-6 text-[10px] font-bold tracking-[0.32em] text-primary-bright">ORDER COLLECTED</p>
         <h2 id="collection-celebration-title" className="display relative mt-3 text-2xl leading-tight sm:text-3xl">THANK YOU FOR USING HUNGRY!</h2>

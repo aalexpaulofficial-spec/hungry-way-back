@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
+import { LogoMark } from "@/components/foodexa/LogoMark";
 
 const groups = [
   ["Platform", ["For Students", "For Faculty", "Institutions", "Analytics"]],
@@ -60,9 +61,9 @@ export function Footer() {
               type="button"
               onClick={onFooterLogoClick}
               aria-label="HUNGRY"
-              className="grid h-9 w-9 place-items-center rounded-full border-0 bg-primary p-0 text-[12px] font-black text-primary-foreground transition hover:scale-110"
+              className="grid h-9 w-9 place-items-center rounded-full border-0 bg-primary p-0 text-[12px] transition hover:scale-110"
             >
-              H
+              <LogoMark className="h-9 w-9" />
             </button>
             <span className="display text-[14px] tracking-[0.3em]">HUNGRY</span>
           </div>
