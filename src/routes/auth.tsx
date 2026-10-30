@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ensureWelcomeEmail } from "@/lib/hungry.functions";
 import { backendConfigured } from "@/lib/backend-config";
 import { SetupNotice } from "@/components/SetupNotice";
+import { Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: z.object({ mode: z.enum(["login", "signup"]).optional() }),
@@ -94,6 +95,7 @@ function SignupForm({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const welcome = useServerFn(ensureWelcomeEmail);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -184,7 +186,12 @@ function SignupForm({ onDone }: { onDone: () => void }) {
         <ErrorText msg={errors.email} />
       </div>
       <div>
-        <input name="password" type="password" placeholder="Password (8+ characters)" className={field} autoComplete="new-password" />
+        <div className="relative">
+          <input name="password" type={showPassword ? "text" : "password"} placeholder="Password (8+ characters)" className={`${field} pr-12`} autoComplete="new-password" />
+          <button type="button" onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
+        </div>
         <ErrorText msg={errors.password} />
       </div>
       {formError && <p className="text-sm text-primary-bright">{formError}</p>}
@@ -200,6 +207,7 @@ function LoginForm() {
   const [errors, setErrors] = useState<Partial<Record<"fullName"|"registrationNumber"|"email"|"password"|"accessCode"|"role", string>>>({});
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -225,7 +233,12 @@ function LoginForm() {
         <ErrorText msg={errors.email} />
       </div>
       <div>
-        <input name="password" type="password" placeholder="Password" className={field} autoComplete="current-password" />
+        <div className="relative">
+          <input name="password" type={showPassword ? "text" : "password"} placeholder="Password" className={`${field} pr-12`} autoComplete="current-password" />
+          <button type="button" onClick={() => setShowPassword((shown) => !shown)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          </button>
+        </div>
         <ErrorText msg={errors.password} />
       </div>
       {formError && <p className="text-sm text-primary-bright">{formError}</p>}
