@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Store, KeyRound, CheckCircle2 } from "lucide-react";
 import { submitCanteenApplication } from "@/lib/hungry.functions";
 import { applicationSchema } from "@/lib/access";
 import { cn } from "@/lib/utils";
 import { backendConfigured } from "@/lib/backend-config";
+import { CanteenOwnerLoginForm } from "@/components/foodexa/CanteenOwnerLoginForm";
 
 const field =
   "w-full rounded-2xl border border-input bg-ink-soft px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none transition focus:border-primary";
@@ -118,35 +118,12 @@ function RegisterForm() {
 }
 
 function DashboardLogin({ onRegister }: { onRegister: () => void }) {
-  const navigate = useNavigate();
-  const [code, setCode] = useState("");
-  const [err, setErr] = useState("");
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!/^[A-Z0-9]{7}$/.test(code)) return setErr("Enter your 7-character canteen code.");
-        navigate({ to: "/canteen", search: { code } });
-      }}
-      className="mx-auto max-w-md space-y-4 text-center"
-    >
+    <div className="mx-auto max-w-md space-y-4 text-center">
       <p className="text-sm text-muted-foreground">
-        Enter the approved 7-character code we emailed you. Owners must apply and receive approval before they can enter.
+        Sign in with the Canteen Owner ID and Password Code sent after approval.
       </p>
-      <button type="button" onClick={onRegister} className="text-xs font-semibold text-primary-bright underline underline-offset-4">
-        Not approved yet? Register your canteen
-      </button>
-      <input
-        value={code}
-        onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))}
-        placeholder="ABC1234"
-        aria-label="Canteen code"
-        className={cn(field, "py-4 text-center font-mono text-2xl tracking-[0.5em]")}
-      />
-      {err && <p className="text-xs text-primary-bright">{err}</p>}
-      <button className="w-full rounded-full bg-primary py-4 text-sm font-semibold text-primary-foreground transition hover:shadow-[0_0_40px_-6px_var(--primary-bright)]">
-        Open dashboard
-      </button>
-    </form>
+      <CanteenOwnerLoginForm submitLabel="Open dashboard" onRegister={onRegister} />
+    </div>
   );
 }

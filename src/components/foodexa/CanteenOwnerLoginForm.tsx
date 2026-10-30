@@ -5,7 +5,7 @@ import { loginCanteenOwner } from "@/lib/hungry.functions";
 
 const field = "w-full rounded-2xl border border-input bg-ink-soft px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground/60 outline-none transition focus:border-primary";
 
-export function CanteenOwnerLoginForm({ initialError = "", onRegister }: { initialError?: string; onRegister?: () => void }) {
+export function CanteenOwnerLoginForm({ initialError = "", onRegister, submitLabel = "Open dashboard" }: { initialError?: string; onRegister?: () => void; submitLabel?: string }) {
   const login = useServerFn(loginCanteenOwner);
   const [loginId, setLoginId] = useState("");
   const [code, setCode] = useState("");
@@ -36,29 +36,37 @@ export function CanteenOwnerLoginForm({ initialError = "", onRegister }: { initi
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-md space-y-4">
-      <input
-        required
-        value={loginId}
-        onChange={(e) => setLoginId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))}
-        placeholder="7-Character Canteen Owner ID"
-        aria-label="7-Character Canteen Owner ID"
-        autoComplete="username"
-        autoCapitalize="characters"
-        className={`${field} py-4 text-center text-sm tracking-normal placeholder:text-muted-foreground placeholder:opacity-100 sm:text-base`}
-      />
-      <input
-        required
-        value={code}
-        onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))}
-        placeholder="7-Character Owner Password Code"
-        aria-label="7-Character Owner Password Code"
-        autoComplete="one-time-code"
-        autoCapitalize="characters"
-        className={`${field} py-4 text-center text-sm tracking-normal placeholder:text-muted-foreground placeholder:opacity-100 sm:text-base`}
-      />
+      <div className="space-y-2 text-left">
+        <label htmlFor="canteen-owner-login-id" className="block text-xs font-semibold text-foreground">Canteen Owner ID (7 characters)</label>
+        <input
+          id="canteen-owner-login-id"
+          required
+          maxLength={7}
+          value={loginId}
+          onChange={(e) => setLoginId(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))}
+          placeholder="ABC1234"
+          autoComplete="username"
+          autoCapitalize="characters"
+          className={`${field} py-4 text-center text-sm tracking-normal placeholder:text-muted-foreground placeholder:opacity-100 sm:text-base`}
+        />
+      </div>
+      <div className="space-y-2 text-left">
+        <label htmlFor="canteen-owner-password-code" className="block text-xs font-semibold text-foreground">Canteen Owner Password Code (7 characters)</label>
+        <input
+          id="canteen-owner-password-code"
+          required
+          maxLength={7}
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7))}
+          placeholder="ABC1234"
+          autoComplete="one-time-code"
+          autoCapitalize="characters"
+          className={`${field} py-4 text-center text-sm tracking-normal placeholder:text-muted-foreground placeholder:opacity-100 sm:text-base`}
+        />
+      </div>
       {(error || initialError) && <p role="alert" className="text-sm text-primary-bright">{error || initialError}</p>}
       <button disabled={busy} className="w-full rounded-full bg-primary py-4 text-sm font-semibold text-primary-foreground transition hover:shadow-[0_0_40px_-6px_var(--primary-bright)] disabled:opacity-60">
-        {busy ? "Verifying…" : "Canteen Owner Login"}
+        {busy ? "Verifying…" : submitLabel}
       </button>
       {onRegister && (
         <button type="button" onClick={onRegister} className="block w-full text-center text-xs font-semibold text-primary-bright underline underline-offset-4">
