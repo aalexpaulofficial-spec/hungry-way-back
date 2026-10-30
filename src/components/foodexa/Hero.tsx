@@ -136,7 +136,7 @@ export function Hero() {
               href="/register-canteen"
               className="group inline-flex min-w-0 shrink items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-primary/60 bg-background px-4 py-3.5 text-[13px] font-semibold text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:px-6 sm:text-sm"
             >
-              Register Canteen
+              Register & Login Canteen
               <span aria-hidden className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1">↗</span>
             </a>
             </div>
