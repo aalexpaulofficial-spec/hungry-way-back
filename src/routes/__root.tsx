@@ -133,6 +133,8 @@ function RootComponent() {
     const app = new URLSearchParams(window.location.search).get("hungry_app");
     if (isStandaloneApp() && (app === "student" || app === "canteen")) {
       markAppInstalled(app);
+      const themeColor = app === "student" ? "#e60012" : "#050505";
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", themeColor);
     }
   }, []);
 

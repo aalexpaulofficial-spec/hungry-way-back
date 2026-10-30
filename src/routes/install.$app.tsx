@@ -68,6 +68,7 @@ function InstallPage() {
     window.addEventListener("appinstalled", confirmInstalled);
 
     if ("serviceWorker" in navigator) {
+      // One idempotent root-scope worker serves both manifests and does not keep app-specific state.
       void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
         setMessage("App installation is unavailable while the service worker cannot be registered. Please try again over HTTPS.");
       });

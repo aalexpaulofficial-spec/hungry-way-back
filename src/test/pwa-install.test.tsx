@@ -9,6 +9,20 @@ vi.mock("motion/react", () => ({
 
 import { HeroInstallButton } from "@/components/foodexa/HeroInstallButton";
 import { isAppInstalled, markAppInstalled } from "@/lib/pwa-install";
+import studentManifestSource from "../../public/manifest-student.webmanifest?raw";
+import canteenManifestSource from "../../public/manifest-canteen.webmanifest?raw";
+
+type InstallManifest = {
+  id: string;
+  name: string;
+  start_url: string;
+  scope: string;
+  theme_color: string;
+  icons: { src: string; type: string; sizes: string }[];
+};
+
+const studentManifest = JSON.parse(studentManifestSource) as InstallManifest;
+const canteenManifest = JSON.parse(canteenManifestSource) as InstallManifest;
 
 describe("separate HUNGRY app install flows", () => {
   beforeEach(() => {
@@ -18,6 +32,22 @@ describe("separate HUNGRY app install flows", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("keeps distinct app identities, launch pages, icons, and theme colours in the shared scope", () => {
+    expect(studentManifest.id).not.toBe(canteenManifest.id);
+    expect(studentManifest.name).toContain("Student App");
+    expect(canteenManifest.name).toContain("Canteen Owner App");
+    expect(studentManifest.start_url).toBe("/auth?hungry_app=student");
+    expect(canteenManifest.start_url).toBe("/register-canteen?hungry_app=canteen");
+    expect(studentManifest.scope).toBe("/");
+    expect(canteenManifest.scope).toBe("/");
+    expect(studentManifest.theme_color).not.toBe(canteenManifest.theme_color);
+    expect(studentManifest.icons.map((icon) => icon.src)).not.toEqual(
+      canteenManifest.icons.map((icon) => icon.src),
+    );
+    expect(studentManifest.icons.some((icon) => icon.sizes === "192x192")).toBe(true);
+    expect(canteenManifest.icons.some((icon) => icon.sizes === "512x512")).toBe(true);
   });
 
   it("persists install status independently for student and canteen apps", () => {
