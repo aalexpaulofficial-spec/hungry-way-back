@@ -253,19 +253,21 @@ function OrderingApp() {
   return (
     <div className="min-h-screen bg-background">
       <div className="relative mx-auto min-h-screen w-full max-w-3xl pb-32">
-        <header className="sticky top-0 z-30 flex items-center justify-between bg-background/80 gap-3 px-5 py-4 backdrop-blur-xl">
-          <div className="flex min-w-0 items-center gap-3">
-          <BackButton inline />
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">Hi, {profile.full_name} 👋</p>
-            <p className="display text-lg tracking-[0.2em]">HUNGRY?</p>
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-2 bg-background/80 px-4 py-3 backdrop-blur-xl sm:flex-nowrap sm:justify-between sm:gap-3 sm:px-5 sm:py-4">
+          <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto sm:gap-3">
+            <BackButton inline />
+            <div className="min-w-0 flex-1">
+              <p className="truncate whitespace-nowrap text-xs text-muted-foreground">{`Hi, ${profile.full_name} 👋`}</p>
+              <p className="display truncate whitespace-nowrap text-lg tracking-[0.2em]">HUNGRY?</p>
+            </div>
           </div>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:flex-initial">
+            <button onClick={() => setSwitching(true)} className="glass flex min-w-0 flex-1 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold sm:max-w-[55%] sm:flex-initial">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary-bright" />
+              <span data-no-translate className="min-w-0 truncate">{canteen.name}</span>
+            </button>
+            <LanguageSelect language={language} onChange={saveLanguage} />
           </div>
-          <button onClick={() => setSwitching(true)} className="glass flex max-w-[55%] items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-primary-bright" />
-            <span data-no-translate className="truncate">{canteen.name}</span>
-          </button>
-          <LanguageSelect language={language} onChange={saveLanguage} />
         </header>
 
         {!ordering && (
@@ -284,15 +286,15 @@ function OrderingApp() {
         </AnimatePresence>
 
         {count > 0 && !checkout && (
-          <motion.button initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setCheckout(true)} className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-[calc(48rem-2rem)] items-center justify-between rounded-full bg-primary px-6 py-4 text-primary-foreground shadow-[var(--shadow-cinema)]">
-            <span className="flex items-center gap-2 text-sm font-semibold"><ShoppingBag className="h-4 w-4" /> {count} item{count > 1 && "s"}</span>
-            <span className="text-sm font-bold">View cart · ₹{subtotal}</span>
+          <motion.button initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} onClick={() => setCheckout(true)} className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-[calc(48rem-2rem)] min-w-0 items-center justify-between gap-3 rounded-full bg-primary px-4 py-4 text-primary-foreground shadow-[var(--shadow-cinema)] sm:px-6">
+            <span className="flex shrink-0 items-center gap-2 text-xs font-semibold sm:text-sm"><ShoppingBag className="h-4 w-4" /> {`${count} ${count === 1 ? "item" : "items"}`}</span>
+            <span className="min-w-0 break-words text-right text-xs font-bold sm:text-sm">View cart · ₹{subtotal}</span>
           </motion.button>
         )}
 
         <nav className="glass fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-3xl justify-around rounded-t-3xl px-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3">
           {([["home", "HOME", Home], ["menu", "MENU", UtensilsCrossed], ["orders", "ORDERS", Receipt], ["you", "YOU", User]] as const).map(([k, label, Icon]) => (
-            <button key={k} onClick={() => setTab(k)} className={cn("flex flex-1 flex-col items-center gap-1 py-1 text-[10px] font-bold tracking-widest transition", tab === k ? "text-primary-bright" : "text-muted-foreground")}>
+            <button key={k} onClick={() => setTab(k)} className={cn("flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[9px] font-bold tracking-normal transition sm:text-[10px] sm:tracking-widest", tab === k ? "text-primary-bright" : "text-muted-foreground")}>
               <Icon className={cn("h-5 w-5 transition", tab === k && "scale-110")} />
               {label}
             </button>
@@ -471,25 +473,25 @@ function Empty({ title, text }: { title: string; text: string }) {
   );
 }
 
-function FoodCard({ item, onOpen, onAdd, wide }: { item: MenuItem; onOpen: (i: MenuItem) => void; onAdd: (i: MenuItem) => void; wide?: boolean }) {
+export function FoodCard({ item, onOpen, onAdd, wide }: { item: MenuItem; onOpen: (i: MenuItem) => void; onAdd: (i: MenuItem) => void; wide?: boolean }) {
   return (
-    <motion.div whileTap={{ scale: 0.97 }} className={cn("group overflow-hidden rounded-3xl border border-border bg-card", wide && "w-60 shrink-0")}>
+    <motion.div whileTap={{ scale: 0.97 }} className={cn("group min-w-0 overflow-hidden rounded-3xl border border-border bg-card", wide && "w-60 shrink-0")}>
       <button onClick={() => onOpen(item)} className="relative block aspect-[4/3] w-full overflow-hidden">
         <img data-no-translate src={foodImage(item.image)} alt={item.name} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
         {item.tag && <span data-no-translate className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground">{item.tag}</span>}
       </button>
-      <div className="flex items-end justify-between gap-2 p-4">
-        <button onClick={() => onOpen(item)} className="text-left">
-        <p data-no-translate className="text-sm font-semibold leading-tight">{item.name}</p>
-          <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />{item.prep_minutes}m</span>
-            <span>{item.veg ? "Veg" : "Non-veg"}</span>
-            {item.stock != null && item.stock > 0 && item.stock <= 5 && <span className="text-primary-bright">Only {item.stock} left</span>}
+      <div className="flex min-w-0 items-end justify-between gap-2 p-3 sm:p-4">
+        <button onClick={() => onOpen(item)} className="min-w-0 flex-1 text-left">
+          <p data-no-translate className="line-clamp-2 break-words text-sm font-semibold leading-tight sm:line-clamp-none sm:break-normal">{item.name}</p>
+          <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:flex-nowrap sm:gap-2">
+            <span className="flex shrink-0 items-center gap-0.5"><Clock className="h-3 w-3" />{item.prep_minutes}m</span>
+            <span className="shrink-0">{item.veg ? "Veg" : "Non-veg"}</span>
+            {item.stock != null && item.stock > 0 && item.stock <= 5 && <span className="max-w-full break-words text-primary-bright">{`Only ${item.stock} left`}</span>}
           </p>
-          <p className="mt-1.5 text-base font-bold">₹{item.price}</p>
+          <p className="mt-1.5 whitespace-nowrap text-base font-bold">₹{item.price}</p>
         </button>
         {item.stock === 0 ? (
-          <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Sold out</span>
+          <span className="max-w-[40%] shrink-0 break-words rounded-full border border-border px-2 py-1 text-center text-[9px] font-bold uppercase leading-tight tracking-normal text-muted-foreground sm:max-w-none sm:px-2.5 sm:text-[10px] sm:tracking-widest">Sold out</span>
         ) : (
           <button onClick={() => onAdd(item)} aria-label={`Add ${item.name}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition hover:scale-110"><Plus className="h-4 w-4" /></button>
         )}
@@ -509,7 +511,7 @@ function HomeTab({ menu, canteen, template, onOpen, onAdd, goMenu }: { menu: Men
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute bottom-5 left-5 right-5">
           <p data-no-translate className="text-xs font-semibold uppercase tracking-widest text-primary-bright">{canteen.name} · {canteen.university_name}</p>
-          <p data-no-translate={template?.heading?.trim() ? "" : undefined} className="display mt-1 text-3xl">{template?.heading?.trim() || "Skip the queue."}</p>
+          <p data-no-translate={template?.heading?.trim() ? "" : undefined} className="display mt-1 break-words text-2xl sm:break-normal sm:text-3xl">{template?.heading?.trim() || "Skip the queue."}</p>
           {template?.description?.trim() && <p data-no-translate className="mt-2 max-w-xl text-sm text-foreground/90">{template.description.trim()}</p>}
           <button onClick={goMenu} className="mt-3 rounded-full bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground">Order now ↗</button>
         </div>
@@ -801,11 +803,11 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
         {orders.map((o) => (
         <button key={o.id} onClick={() => onOpen(o)} className="w-full rounded-3xl border border-border bg-card p-5 text-left transition hover:border-primary/50">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-sm font-bold">{o.order_number}</span>
+            <span className="min-w-0 truncate font-mono text-sm font-bold">{o.order_number}</span>
             <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary-bright"><Clock className="h-3 w-3" />{o.prep_minutes} min</span>
           </div>
           <div className="mt-2 flex justify-end">
-            <span className={cn("rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest", o.status === "ready" || o.status === "pending_payment" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{ORDER_LABELS[o.status]}</span>
+            <span className={cn("max-w-[65%] break-words rounded-full px-3 py-1 text-right text-[10px] font-bold uppercase leading-tight tracking-normal sm:max-w-none sm:text-left sm:leading-normal sm:tracking-widest", o.status === "ready" || o.status === "pending_payment" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>{ORDER_LABELS[o.status]}</span>
           </div>
           <p data-no-translate className="mt-2 truncate text-sm text-muted-foreground">{o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ")}</p>
           <p className="mt-2 flex items-center justify-between text-sm">
@@ -976,7 +978,7 @@ function YouTab({ profile, canteen, onSwitch, onSignOut }: { profile: Profile; c
     <div className="space-y-4 pt-2">
       <div className="glass-red rounded-[2rem] p-6">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">{profile.full_name[0]}</div>
-        <p data-no-translate className="display mt-4 text-2xl">{profile.full_name}</p>
+        <p data-no-translate className="display mt-4 min-w-0 break-words text-2xl sm:break-normal">{profile.full_name}</p>
         <p className="text-sm capitalize text-muted-foreground">{profile.role}{profile.registration_number && <> · <span data-no-translate>{profile.registration_number}</span></>}</p>
         <p className="text-sm text-muted-foreground">{profile.email}</p>
       </div>
