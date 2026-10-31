@@ -91,24 +91,29 @@ export async function isAppInstalled(app: HungryApp): Promise<boolean> {
 
 export function getInstallFallback(app: HungryApp) {
   const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
-  if (app === "canteen" && typeof document !== "undefined" && getPageManifestApp() !== "canteen") {
-    return "Chrome can install the Canteen Dashboard only from its owner login page. Open Canteen Owner Login to continue.";
-  }
+  const appName = app === "canteen" ? "HUNGRY Canteen Dashboard" : "HUNGRY";
   const isAppleMobile = /iphone|ipad|ipod/i.test(ua) ||
     (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   if (isAppleMobile) {
-    return "In Safari, tap Share, then Add to Home Screen. HUNGRY will show as installed after it opens from your Home Screen.";
+    return `In Safari, tap Share, then Add to Home Screen. ${appName} will show as installed after it opens from your Home Screen.`;
+  }
+  if (app === "canteen" && typeof document !== "undefined" && getPageManifestApp() !== "canteen") {
+    return "Open the existing Canteen Owner Login page to install the dashboard.";
   }
   if (/android/i.test(ua)) {
-    return "Chrome did not offer its install prompt. In Chrome, open the menu and choose Install app or Add to Home screen.";
+    return app === "canteen"
+      ? "Chrome did not offer the Canteen Dashboard install prompt. In Chrome, open the menu and choose Install app or Add to Home screen."
+      : "Chrome did not offer its install prompt. In Chrome, open the menu and choose Install app or Add to Home screen.";
   }
   if (/safari/i.test(ua) && !/chrome|chromium|edg/i.test(ua)) {
-    return "In Safari, choose File, then Add to Dock to install HUNGRY.";
+    return `In Safari, choose File, then Add to Dock to install ${appName}.`;
   }
   if (/chrome|edg/i.test(ua)) {
-    return "Chrome did not offer its install prompt. Use the install icon in the address bar if it is available.";
+    return app === "canteen"
+      ? "Chrome did not offer the Canteen Dashboard install prompt. Use the install icon in the address bar if it is available."
+      : "Chrome did not offer its install prompt. Use the install icon in the address bar if it is available.";
   }
-  return "This browser did not offer an install prompt. Open this page in Chrome, Edge, or Safari to install the app.";
+  return `This browser did not offer an install prompt. Open this page in Chrome, Edge, or Safari to install ${appName}.`;
 }
 
 export function isStandaloneApp() {
