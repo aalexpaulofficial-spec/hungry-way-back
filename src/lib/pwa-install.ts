@@ -14,8 +14,8 @@ const appIdentity: Record<HungryApp, { id: string; manifest: string }> = {
   canteen: { id: "/?hungry_app=canteen", manifest: "/manifest-canteen.webmanifest" },
 };
 
-let deferredInstallPrompt: InstallPromptEvent | null = null;
-let deferredInstallPromptApp: HungryApp | null = null;
+const deferredInstallPrompts = new Map<HungryApp, InstallPromptEvent>();
+let latestDeferredInstallApp: HungryApp | null = null;
 let pendingInstallApp: HungryApp | null = null;
 const installPromptSubscribers = new Set<() => void>();
 
@@ -28,16 +28,18 @@ function getPageManifestApp(): HungryApp | null {
 
 if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (event) => {
+    const app = getPageManifestApp();
+    if (!app) return;
     event.preventDefault();
-    deferredInstallPrompt = event as InstallPromptEvent;
-    deferredInstallPromptApp = getPageManifestApp();
+    deferredInstallPrompts.set(app, event as InstallPromptEvent);
+    latestDeferredInstallApp = app;
     installPromptSubscribers.forEach((subscriber) => subscriber());
   });
 }
 
 export function getDeferredInstallPrompt(app?: HungryApp) {
-  if (app && deferredInstallPromptApp !== app) return null;
-  return deferredInstallPrompt;
+  if (app) return deferredInstallPrompts.get(app) ?? null;
+  return latestDeferredInstallApp ? deferredInstallPrompts.get(latestDeferredInstallApp) ?? null : null;
 }
 
 export function getPendingInstallApp() {
@@ -54,9 +56,17 @@ export function subscribeToInstallPrompt(subscriber: () => void) {
 }
 
 export function clearDeferredInstallPrompt(prompt?: InstallPromptEvent) {
-  if (prompt && deferredInstallPrompt !== prompt) return;
-  deferredInstallPrompt = null;
-  deferredInstallPromptApp = null;
+  if (prompt) {
+    for (const [app, deferredPrompt] of deferredInstallPrompts) {
+      if (deferredPrompt === prompt) deferredInstallPrompts.delete(app);
+    }
+    if (latestDeferredInstallApp && !deferredInstallPrompts.has(latestDeferredInstallApp)) {
+      latestDeferredInstallApp = null;
+    }
+  } else {
+    deferredInstallPrompts.clear();
+    latestDeferredInstallApp = null;
+  }
   installPromptSubscribers.forEach((subscriber) => subscriber());
 }
 

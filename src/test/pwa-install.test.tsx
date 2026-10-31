@@ -56,9 +56,9 @@ describe("independent HUNGRY PWA install flows", () => {
 
   it("keeps separate student and owner PWA identities and launch pages", () => {
     expect(studentManifest.id).not.toBe(canteenManifest.id);
-    expect(studentManifest.name).toBe("HUNGRY");
+    expect(studentManifest.name).toBe("Hungry - Food Order");
     expect(studentManifest.start_url).toBe("/auth?hungry_app=student");
-    expect(canteenManifest.name).toBe("HUNGRY CANTEEN DASHBOARD");
+    expect(canteenManifest.name).toBe("Hungry - Canteen Dashboard");
     expect(canteenManifest.start_url).toBe("/canteen?hungry_app=canteen");
     expect(studentManifest.scope).toBe("/");
     expect(canteenManifest.scope).toBe("/");
@@ -96,6 +96,18 @@ describe("independent HUNGRY PWA install flows", () => {
     clearDeferredInstallPrompt(event);
     expect(getDeferredInstallPrompt()).toBeNull();
     unsubscribe();
+  });
+
+  it("retains the canteen prompt independently when its manifest is active", () => {
+    setManifest("canteen");
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
+    }) as InstallPromptEvent;
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(getDeferredInstallPrompt("canteen")).toBe(event);
+    expect(getDeferredInstallPrompt("student")).toBeNull();
   });
 
   it("provides an iOS Add to Home Screen fallback without claiming installation", () => {
@@ -160,11 +172,41 @@ describe("independent HUNGRY PWA install flows", () => {
       prompt,
       userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
     }));
+    const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location");
+    const currentLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get: () => ({ origin: currentLocation.origin, pathname: currentLocation.pathname, search: currentLocation.search, assign }),
+    });
     render(<HeroInstallButton app="canteen" />);
     fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    if (originalLocationDescriptor) Object.defineProperty(window, "location", originalLocationDescriptor);
     expect(prompt).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: /Open Canteen Owner Login/ })).toHaveAttribute("href", "/canteen?hungry_app=canteen");
+    expect(assign).toHaveBeenCalledWith("/canteen?hungry_app=canteen");
+  });
+
+  it("directly prompts for the Canteen Dashboard on its own manifest route", async () => {
+    window.history.replaceState({}, "", "/canteen?hungry_app=canteen");
+    setManifest("canteen");
+    Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
+    const prompt = vi.fn().mockResolvedValue(undefined);
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt,
+      userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
+    }) as InstallPromptEvent;
+    window.dispatchEvent(event);
+    render(<HeroInstallButton app="canteen" />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(prompt).toHaveBeenCalledOnce();
+    await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
+    expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
   });
 
   it("shows the canteen popup and routes to the existing owner login page", async () => {
