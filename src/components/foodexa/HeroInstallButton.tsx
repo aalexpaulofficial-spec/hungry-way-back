@@ -2,13 +2,10 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ArrowRight, Download } from "lucide-react";
 import {
   clearDeferredInstallPrompt,
-  getInstallFallback,
   getDeferredInstallPrompt,
   getPendingInstallApp,
   isAppInstalled,
-  requestInstallFromManifest,
   setPendingInstallApp,
-  subscribeToInstallPrompt,
   type HungryApp,
 } from "@/lib/pwa-install";
 import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
@@ -24,10 +21,9 @@ const copy = {
   },
 } satisfies Record<HungryApp, { download: string; ariaLabel: string }>;
 
-export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: HungryApp; dedicatedInstallPage?: boolean }) {
+export function HeroInstallButton({ app }: { app: HungryApp; dedicatedInstallPage?: boolean }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
-  const [installationNotice, setInstallationNotice] = useState("");
   const installCheckRevision = useRef(0);
   const label = copy[app];
 
@@ -59,7 +55,6 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
       setPendingInstallApp(null);
       clearDeferredInstallPrompt(undefined, app);
       setInstalled(true);
-      setInstallationNotice("");
     };
     updateInstalled();
     window.addEventListener("pageshow", updateInstalled);
@@ -79,12 +74,7 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
     event.preventDefault();
     if (app === "canteen") {
       if (installed) return;
-      if (dedicatedInstallPage) {
-        window.location.assign("/install/canteen");
-        return;
-      }
-      setInstallationNotice("");
-      void handleLandingCanteenInstall();
+      window.location.assign("/install/canteen");
       return;
     }
 
@@ -116,52 +106,6 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
     }
   }
 
-  async function handleLandingCanteenInstall() {
-    const promptEvent = getDeferredInstallPrompt("canteen");
-    const installRequest = promptEvent ? null : requestInstallFromManifest("canteen");
-
-    if (!promptEvent && !installRequest) {
-      setInstallationNotice(getInstallFallback("canteen"));
-      return;
-    }
-
-    setPendingInstallApp("canteen");
-    if (promptEvent) {
-      try {
-        const promptResult = promptEvent.prompt();
-        const choice = await promptEvent.userChoice;
-        clearDeferredInstallPrompt(promptEvent, "canteen");
-        if (choice.outcome === "dismissed") {
-          setPendingInstallApp(null);
-          return;
-        }
-        await promptResult;
-        if (await isAppInstalled("canteen")) {
-          setPendingInstallApp(null);
-          setInstalled(true);
-          setInstallationNotice("");
-        }
-      } catch {
-        setPendingInstallApp(null);
-        clearDeferredInstallPrompt(promptEvent, "canteen");
-        setInstallationNotice(getInstallFallback("canteen"));
-      }
-      return;
-    }
-
-    try {
-      await installRequest;
-      if (await isAppInstalled("canteen")) {
-        setPendingInstallApp(null);
-        setInstalled(true);
-        setInstallationNotice("");
-      }
-    } catch {
-      setPendingInstallApp(null);
-      setInstallationNotice(getInstallFallback("canteen"));
-    }
-  }
-
   return (
     <div className="flex min-w-0 flex-col items-start gap-2">
       <button
@@ -174,9 +118,6 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
         {installed ? "Already Installed" : label.download}
       </button>
       {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
-      {app === "canteen" && installationNotice && !installed && (
-        <p role="status" className="max-w-64 text-xs leading-relaxed text-muted-foreground">{installationNotice}</p>
-      )}
     </div>
   );
 }
