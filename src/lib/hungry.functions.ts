@@ -268,9 +268,10 @@ export const adminLogin = createServerFn({ method: "POST" })
     const db = await admin();
     let userId: string | undefined;
     for (let page = 1; page <= 20 && !userId; page++) {
-      const { data: list } = await db.auth.admin.listUsers({ page, perPage: 200 });
-      userId = list?.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL)?.id;
-      if (!list || list.users.length < 200) break;
+      const { data: list, error } = await db.auth.admin.listUsers({ page, perPage: 200 });
+      if (error || !list) throw new Error("Could not verify the Admin account in Supabase. Please try again.");
+      userId = list.users.find((u) => u.email?.toLowerCase() === ADMIN_EMAIL)?.id;
+      if (list.users.length < 200) break;
     }
     if (!userId) {
       const { data: created, error } = await db.auth.admin.createUser({
@@ -281,9 +282,11 @@ export const adminLogin = createServerFn({ method: "POST" })
       if (error || !created.user) throw new Error("Could not prepare admin account.");
       userId = created.user.id;
     } else {
-      await db.auth.admin.updateUserById(userId, { password: secret, email_confirm: true });
+      const { error } = await db.auth.admin.updateUserById(userId, { password: secret, email_confirm: true });
+      if (error) throw new Error("Could not prepare the Admin account in Supabase. Please try again.");
     }
-    await db.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
+    const { error: roleError } = await db.from("user_roles").upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id,role" });
+    if (roleError) throw new Error("Could not assign the Admin role in Supabase. Please try again.");
     return { ok: true };
   });
 

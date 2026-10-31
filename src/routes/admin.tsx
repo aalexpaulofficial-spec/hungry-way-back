@@ -9,7 +9,6 @@ import { REFUND_STATUS_LABELS } from "@/lib/order-rules";
 import { visibilities, type Visibility } from "@/lib/access";
 import { cn } from "@/lib/utils";
 import { backendConfigured } from "@/lib/backend-config";
-import { SetupNotice } from "@/components/SetupNotice";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -32,25 +31,43 @@ const field =
 
 function AdminPage() {
   const [state, setState] = useState<"loading" | "login" | "ok">("loading");
+  const [gateError, setGateError] = useState("");
   const check = useCallback(async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return setState("login");
-    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
-    setState(isAdmin ? "ok" : "login");
+    setGateError("");
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      // Supabase reports AuthSessionMissingError for a normal signed-out visitor.
+      // That is the expected state for the hidden Admin login screen, not a backend failure.
+      if (error && error.name !== "AuthSessionMissingError") {
+        throw new Error("Could not verify the current Supabase session. Please try signing in again.");
+      }
+      if (!data.user) return setState("login");
+      const { data: isAdmin, error: roleError } = await supabase.rpc("has_role", { _user_id: data.user.id, _role: "admin" });
+      if (roleError) throw new Error("Could not verify your Admin role in Supabase. Please try again.");
+      setState(isAdmin ? "ok" : "login");
+      if (!isAdmin) setGateError("This account does not have HUNGRY Admin access.");
+    } catch (error) {
+      setState("login");
+      setGateError(error instanceof Error ? error.message : "Could not connect to the Admin backend. Please try again.");
+    }
   }, []);
   useEffect(() => {
     if (backendConfigured) check();
+    else {
+      setState("login");
+      setGateError("The Supabase browser configuration is missing. Admin sign-in is unavailable until the backend is configured.");
+    }
   }, [check]);
-  if (!backendConfigured) return <SetupNotice title="Admin isn't connected yet" />;
   if (state === "loading") return <div className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
-  if (state === "login") return <AdminLogin onDone={check} />;
+  if (state === "login") return <AdminLogin onDone={check} initialError={gateError} />;
   return <Dashboard onSignOut={async () => { await supabase.auth.signOut(); setState("login"); }} />;
 }
 
-function AdminLogin({ onDone }: { onDone: () => void }) {
+function AdminLogin({ onDone, initialError = "" }: { onDone: () => Promise<void>; initialError?: string }) {
   const login = useServerFn(adminLogin);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState(initialError);
   const [busy, setBusy] = useState(false);
+  useEffect(() => setErr(initialError), [initialError]);
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -62,7 +79,7 @@ function AdminLogin({ onDone }: { onDone: () => void }) {
       await login({ data: { email, password } });
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error("Sign-in failed");
-      onDone();
+      await onDone();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Invalid admin credentials.");
     } finally {
