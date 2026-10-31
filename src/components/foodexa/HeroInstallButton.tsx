@@ -12,6 +12,7 @@ import {
 } from "@/lib/pwa-install";
 import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
 import { CanteenInstallDialog } from "@/components/foodexa/CanteenInstallDialog";
+import { StudentInstallSuccessDialog } from "@/components/foodexa/StudentInstallSuccessDialog";
 
 const copy = {
   student: {
@@ -27,10 +28,12 @@ const copy = {
 export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
+  const [showStudentInstallSuccess, setShowStudentInstallSuccess] = useState(false);
   const [canteenDialog, setCanteenDialog] = useState<"confirm" | "success" | null>(null);
   const [canteenError, setCanteenError] = useState("");
   const canteenRetryAfterPromptWait = useRef(false);
   const canteenInstallRequested = useRef(false);
+  const studentInstallRequested = useRef(false);
   const installCheckRevision = useRef(0);
   const label = copy[app];
 
@@ -112,6 +115,9 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         canteenInstallRequested.current = false;
         setCanteenError("");
         setCanteenDialog("success");
+      } else if (app === "student" && studentInstallRequested.current) {
+        studentInstallRequested.current = false;
+        setShowStudentInstallSuccess(true);
       }
     };
     updateInstalled();
@@ -156,21 +162,28 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     if (!promptEvent) return;
 
     setPendingInstallApp("student");
+    studentInstallRequested.current = true;
     try {
       const promptResult = promptEvent.prompt();
       const choice = await promptEvent.userChoice;
       clearDeferredInstallPrompt(promptEvent);
       if (choice.outcome === "dismissed") {
         setPendingInstallApp(null);
+        studentInstallRequested.current = false;
         return;
       }
       await promptResult;
       if (await isAppInstalled("student")) {
         setPendingInstallApp(null);
         setInstalled(true);
+        if (studentInstallRequested.current) {
+          studentInstallRequested.current = false;
+          setShowStudentInstallSuccess(true);
+        }
       }
     } catch {
       setPendingInstallApp(null);
+      studentInstallRequested.current = false;
       clearDeferredInstallPrompt(promptEvent);
     }
   }
@@ -245,6 +258,9 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         {installed ? "Already Installed" : label.download}
       </button>
       {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
+      {app === "student" && showStudentInstallSuccess && (
+        <StudentInstallSuccessDialog onClose={() => setShowStudentInstallSuccess(false)} />
+      )}
       {app === "canteen" && canteenDialog && (
         <CanteenInstallDialog
           mode={canteenDialog}
