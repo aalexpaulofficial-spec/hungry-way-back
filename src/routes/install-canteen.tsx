@@ -24,12 +24,14 @@ export const Route = createFileRoute("/install-canteen")({
   component: CanteenInstallPage,
 });
 
-function CanteenInstallPage() {
+export function CanteenInstallPage() {
   const [installed, setInstalled] = useState(false);
   const [promptReady, setPromptReady] = useState(false);
   const [status, setStatus] = useState("");
   const [dialog, setDialog] = useState<"success" | "already" | null>(null);
   const installRequested = useRef(false);
+  const installedRef = useRef(false);
+  const appInstalledAt = useRef(0);
   const checkRevision = useRef(0);
 
   useEffect(() => {
@@ -37,6 +39,10 @@ function CanteenInstallPage() {
     let readinessTimeout: number | undefined;
 
     const updatePromptAvailability = () => {
+      if (installedRef.current) {
+        setPromptReady(false);
+        return;
+      }
       const ready = Boolean(
         getDeferredInstallPrompt("canteen") ||
         typeof (navigator as Navigator & { install?: unknown }).install === "function",
@@ -52,7 +58,23 @@ function CanteenInstallPage() {
       const revision = ++checkRevision.current;
       void isAppInstalled("canteen").then((result) => {
         if (!active || revision !== checkRevision.current) return;
-        setInstalled(result);
+        if (result) {
+          installedRef.current = true;
+          appInstalledAt.current = 0;
+          setInstalled(true);
+          if (readinessTimeout !== undefined) {
+            window.clearTimeout(readinessTimeout);
+            readinessTimeout = undefined;
+          }
+          setPromptReady(false);
+          setStatus("");
+        } else {
+          const relatedAppsApiAvailable = typeof (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps === "function";
+          const recentInstallEvent = appInstalledAt.current > 0 && Date.now() - appInstalledAt.current < 8000;
+          if (recentInstallEvent || (appInstalledAt.current > 0 && !relatedAppsApiAvailable)) return;
+          installedRef.current = false;
+          setInstalled(false);
+        }
       });
     };
     const updateWhenVisible = () => {
@@ -64,6 +86,12 @@ function CanteenInstallPage() {
       setPendingInstallApp(null);
       clearDeferredInstallPrompt(undefined, "canteen");
       installRequested.current = false;
+      installedRef.current = true;
+      appInstalledAt.current = Date.now();
+      if (readinessTimeout !== undefined) {
+        window.clearTimeout(readinessTimeout);
+        readinessTimeout = undefined;
+      }
       setInstalled(true);
       setPromptReady(false);
       setStatus("");
@@ -76,9 +104,21 @@ function CanteenInstallPage() {
     if (!getDeferredInstallPrompt("canteen") && typeof (navigator as Navigator & { install?: unknown }).install !== "function") {
       setStatus("Preparing the installation option…");
       readinessTimeout = window.setTimeout(() => {
+        if (installedRef.current) return;
         updatePromptAvailability();
         if (!getDeferredInstallPrompt("canteen") && typeof (navigator as Navigator & { install?: unknown }).install !== "function") {
-          setStatus("Direct installation isn't available in this browser right now. Please try again later.");
+          void isAppInstalled("canteen").then((result) => {
+            if (!active || installedRef.current) return;
+            if (result) {
+              installedRef.current = true;
+              appInstalledAt.current = 0;
+              setInstalled(true);
+              setPromptReady(false);
+              setStatus("");
+              return;
+            }
+            setStatus("Direct installation isn't available in this browser right now. Please try again later.");
+          });
         }
       }, 4000);
     }
@@ -109,8 +149,11 @@ function CanteenInstallPage() {
     if (!promptEvent && !installRequest) {
       void isAppInstalled("canteen").then((result) => {
         if (result) {
+          installedRef.current = true;
+          appInstalledAt.current = 0;
           setInstalled(true);
           setStatus("");
+          setPromptReady(false);
           setDialog("already");
         } else {
           setStatus("Direct installation isn't available in this browser right now. Please try again later.");
@@ -139,7 +182,9 @@ function CanteenInstallPage() {
         if (await isAppInstalled("canteen")) {
           setPendingInstallApp(null);
           installRequested.current = false;
+          installedRef.current = true;
           setInstalled(true);
+          setStatus("");
           setDialog("success");
         }
         return;
@@ -148,7 +193,11 @@ function CanteenInstallPage() {
       await installRequest;
       setPendingInstallApp(null);
       installRequested.current = false;
+      installedRef.current = true;
+      appInstalledAt.current = 0;
       setInstalled(true);
+      setPromptReady(false);
+      setStatus("");
       setDialog("success");
     } catch {
       setPendingInstallApp(null);
