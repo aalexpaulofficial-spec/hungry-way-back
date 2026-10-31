@@ -31,6 +31,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [canteenError, setCanteenError] = useState("");
   const canteenRetryAfterPromptWait = useRef(false);
   const canteenInstallRequested = useRef(false);
+  const installCheckRevision = useRef(0);
   const label = copy[app];
 
   useEffect(() => {
@@ -74,10 +75,15 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
   useEffect(() => {
     let active = true;
     const updateInstalled = () => {
+      const revision = ++installCheckRevision.current;
       void isAppInstalled(app).then((result) => {
-        if (!active) return;
+        if (!active || revision !== installCheckRevision.current) return;
         if (result) {
           setInstalled(true);
+          if (app === "canteen") {
+            setCanteenError("");
+            setCanteenDialog((current) => current === "confirm" ? null : current);
+          }
         } else if (
           app !== "student" ||
           typeof (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps === "function"
@@ -98,11 +104,13 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     };
     const onAppInstalled = () => {
       if (getPendingInstallApp() !== app) return;
+      installCheckRevision.current += 1;
       setPendingInstallApp(null);
       clearDeferredInstallPrompt(undefined, app);
       setInstalled(true);
       if (app === "canteen" && canteenInstallRequested.current) {
         canteenInstallRequested.current = false;
+        setCanteenError("");
         setCanteenDialog("success");
       }
     };
@@ -122,15 +130,25 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (installed) {
-      setShowInstalledDialog(true);
-      return;
-    }
-
     if (app === "canteen") {
+      if (!installed && await isAppInstalled("canteen")) {
+        setInstalled(true);
+        setCanteenError("");
+        setShowInstalledDialog(true);
+        return;
+      }
+      if (installed) {
+        setShowInstalledDialog(true);
+        return;
+      }
       setCanteenError("");
       canteenRetryAfterPromptWait.current = false;
       setCanteenDialog("confirm");
+      return;
+    }
+
+    if (installed) {
+      setShowInstalledDialog(true);
       return;
     }
 
