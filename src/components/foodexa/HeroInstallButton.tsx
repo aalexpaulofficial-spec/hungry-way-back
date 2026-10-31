@@ -155,8 +155,8 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (app === "canteen" && dedicatedInstallPage) {
-      window.location.assign("/install-canteen");
+    if (dedicatedInstallPage) {
+      window.location.assign(app === "student" ? "/install-hungry" : "/install-canteen");
       return;
     }
     if (app === "canteen") {
