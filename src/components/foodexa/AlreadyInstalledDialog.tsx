@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { ArrowRight, X } from "lucide-react";
+import { LogoMark } from "@/components/foodexa/LogoMark";
 import type { HungryApp } from "@/lib/pwa-install";
 
 const details = {
@@ -31,7 +32,9 @@ export function AlreadyInstalledDialog({ app, onClose }: { app: HungryApp; onClo
     <div className="pwa-installed-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section aria-modal="true" aria-labelledby="pwa-installed-title" className="pwa-installed-dialog" role="dialog">
         <button aria-label="Close dialog" className="pwa-installed-close" onClick={onClose} type="button"><X aria-hidden="true" className="h-5 w-5" /></button>
-        <img alt="HUNGRY" className="pwa-installed-logo" height="80" src="/pwa-icon-192.png" width="80" />
+        <div aria-label="HUNGRY" className="pwa-installed-logo-wrap" role="img">
+          <LogoMark className="pwa-installed-logo" />
+        </div>
         <h2 className="pwa-installed-title" id="pwa-installed-title">Already Installed</h2>
         <p className="pwa-installed-message">{copy.message}</p>
         <a className="pwa-installed-primary" href={copy.href}>{copy.action}<ArrowRight aria-hidden="true" className="h-5 w-5" /></a>
