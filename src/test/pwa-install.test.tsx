@@ -184,27 +184,18 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
   });
 
-  it("does not reuse the student prompt or navigate to an owner session page for Canteen", async () => {
+  it("shows the canteen owner confirmation before using a canteen-specific native prompt", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
     const prompt = vi.fn().mockResolvedValue(undefined);
     window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
       prompt,
       userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
     }));
-    const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location");
-    const currentLocation = window.location;
-    const assign = vi.fn();
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      get: () => ({ origin: currentLocation.origin, pathname: currentLocation.pathname, search: currentLocation.search, assign }),
-    });
     render(<HeroInstallButton app="canteen" />);
     fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    if (originalLocationDescriptor) Object.defineProperty(window, "location", originalLocationDescriptor);
+    expect(screen.getByRole("heading", { name: "Are You a Canteen Owner?" })).toBeInTheDocument();
     expect(prompt).not.toHaveBeenCalled();
-    expect(assign).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent("cannot install a second PWA directly");
+    expect(screen.queryByText(/cannot install a second PWA/i)).not.toBeInTheDocument();
   });
 
   it("directly prompts for the Canteen Dashboard on its own manifest route", async () => {
@@ -219,14 +210,13 @@ describe("independent HUNGRY PWA install flows", () => {
     window.dispatchEvent(event);
     render(<HeroInstallButton app="canteen" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledOnce();
     await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
+    expect(screen.getByRole("heading", { name: "Installation Successful!" })).toBeInTheDocument();
   });
 
   it("uses a manifest-targeted native install from the landing button when supported", async () => {
@@ -235,11 +225,9 @@ describe("independent HUNGRY PWA install flows", () => {
     Object.defineProperty(navigator, "install", { configurable: true, value: install });
     render(<HeroInstallButton app="canteen" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(install).toHaveBeenCalledWith({
       manifest: `${window.location.origin}/manifest-canteen.webmanifest`,
     });
