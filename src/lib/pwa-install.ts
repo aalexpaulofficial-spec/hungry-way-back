@@ -99,7 +99,16 @@ export function getInstallFallback(app: HungryApp) {
   if (isAppleMobile) {
     return "In Safari, tap Share, then Add to Home Screen. HUNGRY will show as installed after it opens from your Home Screen.";
   }
-  return "Chrome has not offered an installation prompt for this page yet. Try again in Chrome after the page finishes loading.";
+  if (/android/i.test(ua)) {
+    return "Chrome did not offer its install prompt. In Chrome, open the menu and choose Install app or Add to Home screen.";
+  }
+  if (/safari/i.test(ua) && !/chrome|chromium|edg/i.test(ua)) {
+    return "In Safari, choose File, then Add to Dock to install HUNGRY.";
+  }
+  if (/chrome|edg/i.test(ua)) {
+    return "Chrome did not offer its install prompt. Use the install icon in the address bar if it is available.";
+  }
+  return "This browser did not offer an install prompt. Open this page in Chrome, Edge, or Safari to install the app.";
 }
 
 export function isStandaloneApp() {
