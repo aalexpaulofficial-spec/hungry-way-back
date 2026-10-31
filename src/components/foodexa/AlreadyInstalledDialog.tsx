@@ -7,15 +7,17 @@ import type { HungryApp } from "@/lib/pwa-install";
 const details = {
   student: {
     message: "HUNGRY is already installed on your device. You can launch it anytime from your home screen or desktop, or start ordering right now!",
-    action: "Start Ordering",
-    href: "/auth?hungry_app=student",
+    action: "Start Ordering in App",
   },
   canteen: {
     message: "HUNGRY Canteen Dashboard is already installed on your device. You can launch it anytime from your home screen or desktop, or manage your canteen right now!",
     action: "Open Canteen Dashboard",
     href: "/register-canteen?hungry_app=canteen",
   },
-} satisfies Record<HungryApp, { message: string; action: string; href: string }>;
+} satisfies {
+  student: { message: string; action: string };
+  canteen: { message: string; action: string; href: string };
+};
 
 export function AlreadyInstalledDialog({ app, onClose }: { app: HungryApp; onClose: () => void }) {
   const copy = details[app];
@@ -38,7 +40,19 @@ export function AlreadyInstalledDialog({ app, onClose }: { app: HungryApp; onClo
         </div>
         <h2 className="pwa-installed-title" id="pwa-installed-title">Already Installed</h2>
         <p className="pwa-installed-message">{copy.message}</p>
-        <a className="pwa-installed-primary" href={copy.href}>{copy.action}<ArrowRight aria-hidden="true" className="h-5 w-5" /></a>
+        {app === "student" ? (
+          <button
+            className="pwa-installed-primary border-0 font-[inherit] cursor-default disabled:opacity-100"
+            disabled
+            type="button"
+          >
+            {details.student.action}<ArrowRight aria-hidden="true" className="h-5 w-5" />
+          </button>
+        ) : (
+          <a className="pwa-installed-primary" href={details.canteen.href}>
+            {details.canteen.action}<ArrowRight aria-hidden="true" className="h-5 w-5" />
+          </a>
+        )}
         <button className="pwa-installed-secondary" onClick={onClose} type="button">Close</button>
       </section>
     </div>,
