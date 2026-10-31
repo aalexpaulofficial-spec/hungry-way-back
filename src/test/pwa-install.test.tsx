@@ -57,7 +57,7 @@ describe("independent HUNGRY PWA install flows", () => {
 
   it("keeps separate student and owner PWA identities and launch pages", () => {
     expect(studentManifest.id).not.toBe(canteenManifest.id);
-    expect(studentManifest.name).toBe("Hungry - Food Order");
+    expect(studentManifest.name).toBe("Hungry");
     expect(studentManifest.start_url).toBe("/auth?hungry_app=student");
     expect(canteenManifest.name).toBe("Hungry - Canteen Dashboard");
     expect(canteenManifest.start_url).toBe("/canteen?hungry_app=canteen");
