@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CanteenRouteImport } from './routes/canteen'
+import { Route as InstallCanteenRouteImport } from './routes/install-canteen'
 import { Route as RegisterCanteenRouteImport } from './routes/register-canteen'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
@@ -42,6 +43,11 @@ const CanteenRoute = CanteenRouteImport.update({
   path: '/canteen',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InstallCanteenRoute = InstallCanteenRouteImport.update({
+  id: '/install-canteen',
+  path: '/install-canteen',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterCanteenRoute = RegisterCanteenRouteImport.update({
   id: '/register-canteen',
   path: '/register-canteen',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
+  '/install-canteen': typeof InstallCanteenRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
+  '/install-canteen': typeof InstallCanteenRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/app': typeof AuthenticatedAppRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
+  '/install-canteen': typeof InstallCanteenRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
+    | '/install-canteen'
     | '/register-canteen'
     | '/app'
     | '/api/public/razorpay-webhook'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
+    | '/install-canteen'
     | '/register-canteen'
     | '/app'
     | '/api/public/razorpay-webhook'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
+    | '/install-canteen'
     | '/register-canteen'
     | '/_authenticated/app'
     | '/api/public/razorpay-webhook'
@@ -125,6 +137,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   CanteenRoute: typeof CanteenRoute
+  InstallCanteenRoute: typeof InstallCanteenRoute
   RegisterCanteenRoute: typeof RegisterCanteenRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
 }
@@ -164,6 +177,13 @@ declare module '@tanstack/react-router' {
       path: '/canteen'
       fullPath: '/canteen'
       preLoaderRoute: typeof CanteenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/install-canteen': {
+      id: '/install-canteen'
+      path: '/install-canteen'
+      fullPath: '/install-canteen'
+      preLoaderRoute: typeof InstallCanteenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register-canteen': {
@@ -207,6 +227,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   CanteenRoute: CanteenRoute,
+  InstallCanteenRoute: InstallCanteenRoute,
   RegisterCanteenRoute: RegisterCanteenRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
 }

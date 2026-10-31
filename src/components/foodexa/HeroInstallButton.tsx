@@ -25,7 +25,7 @@ const copy = {
   },
 } satisfies Record<HungryApp, { download: string; ariaLabel: string }>;
 
-export function HeroInstallButton({ app }: { app: HungryApp }) {
+export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: HungryApp; dedicatedInstallPage?: boolean }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
   const [showStudentInstallSuccess, setShowStudentInstallSuccess] = useState(false);
@@ -155,6 +155,10 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
+    if (app === "canteen" && dedicatedInstallPage) {
+      window.location.assign("/install-canteen");
+      return;
+    }
     if (app === "canteen") {
       if (!installed && await isAppInstalled("canteen")) {
         setInstalled(true);

@@ -134,7 +134,7 @@ export function Hero() {
                 </span>
               </a>
               <HeroInstallButton app="student" />
-              <HeroInstallButton app="canteen" />
+              <HeroInstallButton app="canteen" dedicatedInstallPage />
             </div>
             <a
               href="#students"
