@@ -184,14 +184,14 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
   });
 
-  it("waits for the canteen-specific install prompt and lets the owner retry", async () => {
+  it("enables the canteen download button only after its install prompt is ready", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
     const prompt = vi.fn().mockResolvedValue(undefined);
     render(<HeroInstallButton app="canteen" />);
     fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
     expect(screen.getByRole("heading", { name: "Are You a Canteen Owner?" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
-    expect(screen.getByRole("alert")).toHaveTextContent("The download prompt is still getting ready.");
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing your download");
+    expect(screen.getByRole("button", { name: /Continue to Download/ })).toBeDisabled();
 
     await act(async () => {
       window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
@@ -200,7 +200,8 @@ describe("independent HUNGRY PWA install flows", () => {
       }));
       await Promise.resolve();
     });
-    expect(screen.getByRole("alert")).toHaveTextContent("The download prompt is ready.");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue to Download/ })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledOnce();

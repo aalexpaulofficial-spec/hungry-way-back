@@ -30,8 +30,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
   const [showStudentInstallSuccess, setShowStudentInstallSuccess] = useState(false);
   const [canteenDialog, setCanteenDialog] = useState<"confirm" | "success" | null>(null);
-  const [canteenError, setCanteenError] = useState("");
-  const canteenRetryAfterPromptWait = useRef(false);
+  const [canteenInstallReady, setCanteenInstallReady] = useState(false);
+  const [canteenInstallStatus, setCanteenInstallStatus] = useState<"waiting" | "unavailable" | "cancelled" | null>(null);
   const canteenInstallRequested = useRef(false);
   const studentInstallRequested = useRef(false);
   const installCheckRevision = useRef(0);
@@ -51,23 +51,40 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
 
     const previousManifest = manifestLink.href;
     const canteenManifest = new URL("/manifest-canteen.webmanifest", window.location.origin).href;
+    let timeout: number | undefined;
     const updatePromptAvailability = () => {
       const promptReady = Boolean(
         getDeferredInstallPrompt("canteen") ||
         typeof (navigator as Navigator & { install?: unknown }).install === "function",
       );
-      if (promptReady && canteenRetryAfterPromptWait.current) {
-        canteenRetryAfterPromptWait.current = false;
-        setCanteenError("The download prompt is ready. Click Continue to Download to try again.");
+      setCanteenInstallReady(promptReady);
+      if (promptReady) {
+        if (timeout !== undefined) window.clearTimeout(timeout);
+        setCanteenInstallStatus(null);
+      } else {
+        setCanteenInstallStatus((current) =>
+          current === "cancelled" || current === "unavailable" ? current : "waiting",
+        );
       }
     };
 
     const unsubscribe = subscribeToInstallPrompt(updatePromptAvailability);
     if (manifestLink.href !== canteenManifest) manifestLink.href = canteenManifest;
     updatePromptAvailability();
+    if (!getDeferredInstallPrompt("canteen") && typeof (navigator as Navigator & { install?: unknown }).install !== "function") {
+      timeout = window.setTimeout(() => {
+        const promptReady = Boolean(
+          getDeferredInstallPrompt("canteen") ||
+          typeof (navigator as Navigator & { install?: unknown }).install === "function",
+        );
+        setCanteenInstallReady(promptReady);
+        setCanteenInstallStatus(promptReady ? null : "unavailable");
+      }, 4000);
+    }
 
     return () => {
       unsubscribe();
+      if (timeout !== undefined) window.clearTimeout(timeout);
       if (createdManifestLink) {
         manifestLink?.remove();
       } else if (manifestLink?.href === canteenManifest && previousManifest && previousManifest !== canteenManifest) {
@@ -84,7 +101,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         if (result) {
           setInstalled(true);
           if (app === "canteen") {
-            setCanteenError("");
+            setCanteenInstallReady(false);
+            setCanteenInstallStatus(null);
             setCanteenDialog((current) => current === "confirm" ? null : current);
           }
         } else if (
@@ -113,7 +131,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       setInstalled(true);
       if (app === "canteen" && canteenInstallRequested.current) {
         canteenInstallRequested.current = false;
-        setCanteenError("");
+        setCanteenInstallReady(false);
+        setCanteenInstallStatus(null);
         setCanteenDialog("success");
       } else if (app === "student" && studentInstallRequested.current) {
         studentInstallRequested.current = false;
@@ -147,8 +166,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         setShowInstalledDialog(true);
         return;
       }
-      setCanteenError("");
-      canteenRetryAfterPromptWait.current = false;
+      setCanteenInstallReady(false);
+      setCanteenInstallStatus(null);
       setCanteenDialog("confirm");
       return;
     }
@@ -192,11 +211,11 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     const promptEvent = getDeferredInstallPrompt("canteen");
     const installRequest = promptEvent ? null : requestInstallFromManifest("canteen");
     if (!promptEvent && !installRequest) {
-      canteenRetryAfterPromptWait.current = true;
-      setCanteenError("The download prompt is still getting ready. Please wait a moment and try again.");
+      setCanteenInstallReady(false);
+      setCanteenInstallStatus("unavailable");
       return;
     }
-    setCanteenError("");
+    setCanteenInstallStatus(null);
 
     setPendingInstallApp("canteen");
     canteenInstallRequested.current = true;
@@ -210,7 +229,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         if (choice.outcome === "dismissed") {
           setPendingInstallApp(null);
           canteenInstallRequested.current = false;
-          setCanteenError("The download was canceled. You can try again.");
+          setCanteenInstallReady(false);
+          setCanteenInstallStatus("cancelled");
           setCanteenDialog("confirm");
           return;
         }
@@ -225,7 +245,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         setPendingInstallApp(null);
         canteenInstallRequested.current = false;
         clearDeferredInstallPrompt(promptEvent);
-        setCanteenError("We could not open the download prompt. Please try again.");
+        setCanteenInstallReady(false);
+        setCanteenInstallStatus("unavailable");
         setCanteenDialog("confirm");
       }
       return;
@@ -241,7 +262,8 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     } catch {
       setPendingInstallApp(null);
       canteenInstallRequested.current = false;
-      setCanteenError("The download was canceled or could not be completed. Please try again.");
+      setCanteenInstallReady(false);
+      setCanteenInstallStatus("unavailable");
       setCanteenDialog("confirm");
     }
   }
@@ -266,11 +288,12 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
           mode={canteenDialog}
           onContinue={() => void handleCanteenContinue()}
           onClose={() => {
-            canteenRetryAfterPromptWait.current = false;
-            setCanteenError("");
+            setCanteenInstallReady(false);
+            setCanteenInstallStatus(null);
             setCanteenDialog(null);
           }}
-          error={canteenError}
+          installReady={canteenInstallReady}
+          status={canteenInstallStatus}
         />
       )}
     </div>

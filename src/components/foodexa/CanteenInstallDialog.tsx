@@ -20,14 +20,21 @@ export function CanteenInstallDialog({
   mode,
   onContinue,
   onClose,
-  error,
+  installReady = true,
+  status,
 }: {
   mode: DialogMode;
   onContinue: () => void;
   onClose: () => void;
-  error?: string;
+  installReady: boolean;
+  status?: "waiting" | "unavailable" | "cancelled" | null;
 }) {
   const copy = content[mode];
+  const statusCopy = {
+    waiting: "Preparing your download…",
+    unavailable: "Installation isn't available in this browser right now. Please try again later.",
+    cancelled: "Installation wasn't completed. Reload this page when you're ready to try again.",
+  };
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -70,14 +77,15 @@ export function CanteenInstallDialog({
           {copy.title}
         </h2>
         <p className="pwa-installed-message">{copy.message}</p>
-        {mode === "confirm" && error && (
-          <p className="mb-4 text-sm leading-relaxed text-primary-bright" role="alert">{error}</p>
+        {mode === "confirm" && status && (
+          <p className="mb-4 text-sm leading-relaxed text-muted-foreground" role="status">{statusCopy[status]}</p>
         )}
         {mode === "confirm" ? (
           <>
             <button
-              className="pwa-installed-primary border-0 font-[inherit] cursor-pointer"
+              className="pwa-installed-primary border-0 font-[inherit] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               onClick={onContinue}
+              disabled={!installReady}
               type="button"
             >
               Continue to Download<ArrowRight aria-hidden="true" className="h-5 w-5" />
