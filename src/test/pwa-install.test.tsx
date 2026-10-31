@@ -184,18 +184,28 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
   });
 
-  it("shows the canteen owner confirmation before using a canteen-specific native prompt", async () => {
+  it("waits for the canteen-specific install prompt and lets the owner retry", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
     const prompt = vi.fn().mockResolvedValue(undefined);
-    window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
-      prompt,
-      userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
-    }));
     render(<HeroInstallButton app="canteen" />);
     fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
     expect(screen.getByRole("heading", { name: "Are You a Canteen Owner?" })).toBeInTheDocument();
-    expect(prompt).not.toHaveBeenCalled();
-    expect(screen.queryByText(/cannot install a second PWA/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("The download prompt is still getting ready.");
+
+    await act(async () => {
+      window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+        prompt,
+        userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
+      }));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("The download prompt is ready.");
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(prompt).toHaveBeenCalledOnce();
+    await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
+    expect(screen.getByRole("heading", { name: "Installation Successful!" })).toBeInTheDocument();
   });
 
   it("directly prompts for the Canteen Dashboard on its own manifest route", async () => {

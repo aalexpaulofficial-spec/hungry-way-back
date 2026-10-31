@@ -10,8 +10,7 @@
   "background_color": "#050505",
   "theme_color": "#050505",
   "related_applications": [
-    { "platform": "webapp", "id": "https://hungryofficial.vercel.app/?hungry_app=student", "url": "/manifest-student.webmanifest" },
-    { "platform": "webapp", "id": "https://hungryofficial.vercel.app/?hungry_app=canteen", "url": "/manifest-canteen.webmanifest" }
+    { "platform": "webapp", "id": "/?hungry_app=canteen", "url": "/manifest-canteen.webmanifest" }
   ],
   "icons": [
     { "src": "/pwa-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

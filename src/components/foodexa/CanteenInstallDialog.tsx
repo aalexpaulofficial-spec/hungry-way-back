@@ -20,10 +20,12 @@ export function CanteenInstallDialog({
   mode,
   onContinue,
   onClose,
+  error,
 }: {
   mode: DialogMode;
   onContinue: () => void;
   onClose: () => void;
+  error?: string;
 }) {
   const copy = content[mode];
 
@@ -68,6 +70,9 @@ export function CanteenInstallDialog({
           {copy.title}
         </h2>
         <p className="pwa-installed-message">{copy.message}</p>
+        {mode === "confirm" && error && (
+          <p className="mb-4 text-sm leading-relaxed text-primary-bright" role="alert">{error}</p>
+        )}
         {mode === "confirm" ? (
           <>
             <button
