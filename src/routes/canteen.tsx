@@ -30,6 +30,7 @@ export const Route = createFileRoute("/canteen")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
+    links: [{ rel: "manifest", href: "/manifest-canteen.webmanifest" }],
   }),
   component: CanteenPage,
 });

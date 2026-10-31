@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { isAppInstalled, type HungryApp } from "@/lib/pwa-install";
+import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
 
 const copy = {
   student: {
@@ -18,7 +19,19 @@ const copy = {
 export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [showAudience, setShowAudience] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const [showInstalledDialog, setShowInstalledDialog] = useState(false);
   const label = copy[app];
+
+  async function handleDownload(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    const confirmedInstalled = installed || await isAppInstalled(app);
+    if (confirmedInstalled) {
+      setInstalled(true);
+      setShowInstalledDialog(true);
+      return;
+    }
+    window.location.assign(`/install/${app}`);
+  }
 
   useEffect(() => {
     let active = true;
@@ -45,9 +58,11 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
   }, [app]);
 
   return (
+    <>
     <a
       href={`/install/${app}`}
       aria-label={installed ? "Already Installed" : label.ariaLabel}
+      onClick={(event) => void handleDownload(event)}
       className="group inline-flex min-w-0 max-w-full shrink items-center justify-center gap-1.5 whitespace-normal rounded-full border border-primary/60 bg-background px-4 py-3.5 text-center text-[13px] font-semibold leading-tight text-foreground transition-all duration-300 hover:scale-[1.04] hover:border-primary hover:shadow-[0_0_30px_-4px_var(--primary-bright)] sm:whitespace-nowrap sm:px-6 sm:text-sm"
     >
       <span className="relative inline-grid min-w-0 max-w-full overflow-hidden">
@@ -65,5 +80,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       </span>
       <span aria-hidden className="transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1">↗</span>
     </a>
+    {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Download, Smartphone } from "lucide-react";
+import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
 import {
   clearDeferredInstallPrompt,
   getDeferredInstallPrompt,
@@ -17,14 +18,16 @@ const appDetails = {
     audience: "Students, Faculty & Guests",
     description: "Open Create Account / Login with Student, Faculty and Guest options.",
     manifest: "/manifest-student.webmanifest",
+    launchPath: "/auth?hungry_app=student",
   },
   canteen: {
     name: "HUNGRY Canteen Dashboard",
     audience: "Canteen Owners",
-    description: "Open Register & Login Canteen with registration and owner login.",
+    description: "Open the Canteen Owner Login and manage your dashboard.",
     manifest: "/manifest-canteen.webmanifest",
+    launchPath: "/canteen?hungry_app=canteen",
   },
-} satisfies Record<HungryApp, { name: string; audience: string; description: string; manifest: string }>;
+} satisfies Record<HungryApp, { name: string; audience: string; description: string; manifest: string; launchPath: string }>;
 
 export const Route = createFileRoute("/install/$app")({
   head: ({ params }) => ({
@@ -44,12 +47,16 @@ function InstallPage() {
   const [message, setMessage] = useState("");
   const [instructions, setInstructions] = useState("Use your browser menu to install this app.");
   const [installing, setInstalling] = useState(false);
+  const [showInstalledDialog, setShowInstalledDialog] = useState(false);
 
   useEffect(() => {
     let active = true;
     const updateInstalled = () => {
       void isAppInstalled(app).then((result) => {
-        if (active) setInstalled(result);
+        if (active) {
+          setInstalled(result);
+          if (result) setShowInstalledDialog(true);
+        }
       });
     };
     const updateWhenVisible = () => {
@@ -59,6 +66,7 @@ function InstallPage() {
       clearDeferredInstallPrompt();
       setInstalled(true);
       setInstalling(false);
+      setShowInstalledDialog(true);
       setMessage("Installation confirmed. You can open the app from your Home Screen or app launcher.");
     };
 
@@ -106,6 +114,7 @@ function InstallPage() {
         setInstalling(false);
         const installed = await isAppInstalled(app);
         setInstalled(installed);
+        if (installed) setShowInstalledDialog(true);
         setMessage(
           installed
             ? "Installation confirmed. You can open the app from your Home Screen or app launcher."
@@ -121,6 +130,7 @@ function InstallPage() {
   }
 
   return (
+    <>
     <main className="grain relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 py-16">
       <div aria-hidden className="ember anim-pulse-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2" />
       <section className="glass-red relative w-full max-w-xl rounded-[2rem] p-7 sm:p-10">
@@ -135,9 +145,9 @@ function InstallPage() {
         <p className="mt-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{details.description}</p>
 
         {installed ? (
-          <div role="status" className="mt-8 rounded-2xl border border-primary/40 bg-primary/10 px-5 py-4 text-sm text-foreground">
-            Already Installed. Open it from your Home Screen or app launcher.
-          </div>
+          <a className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground" href={details.launchPath}>
+            {app === "student" ? "Start Ordering" : "Open Canteen Dashboard"}
+          </a>
         ) : promptEvent ? (
           <button
             type="button"
@@ -156,9 +166,11 @@ function InstallPage() {
 
         {message && <p role="status" className="mt-4 text-sm text-muted-foreground">{message}</p>}
         <p className="mt-6 text-xs leading-relaxed text-muted-foreground/80">
-          After installing, the app opens directly to {app === "student" ? "Create Account / Login" : "Register & Login Canteen"}. You can still use the website in your browser.
+          After installing, {app === "student" ? "sign in and order from your campus canteen" : "sign in to open your Canteen Dashboard"}. You can still use the website in your browser.
         </p>
       </section>
     </main>
+    {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
+    </>
   );
 }
