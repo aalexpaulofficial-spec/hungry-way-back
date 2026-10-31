@@ -28,8 +28,15 @@ const copy = {
 export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
+  const [showInstalledMessage, setShowInstalledMessage] = useState(false);
   const [fallback, setFallback] = useState("");
   const label = copy[app];
+
+  useEffect(() => {
+    if (!showInstalledMessage) return;
+    const timeout = window.setTimeout(() => setShowInstalledMessage(false), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [showInstalledMessage]);
 
   useEffect(() => {
     let active = true;
@@ -73,7 +80,10 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (app === "student" && installed) return;
+    if (app === "student" && installed) {
+      setShowInstalledMessage(true);
+      return;
+    }
     setFallback("");
 
     if (installed) {
@@ -150,6 +160,15 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         {installed ? <ArrowRight aria-hidden="true" className="h-4 w-4" /> : <Download aria-hidden="true" className="h-4 w-4" />}
         {installed ? "Already Installed" : label.download}
       </button>
+      {app === "student" && showInstalledMessage && (
+        <p
+          className="max-w-xs rounded-xl border border-primary/35 bg-background/95 px-3 py-2 text-xs leading-relaxed text-foreground shadow-[0_0_16px_-8px_var(--primary-bright)]"
+          role="status"
+          aria-live="polite"
+        >
+          HUNGRY is already installed on your device.
+        </p>
+      )}
       {app === "canteen" && fallback && (
         <p className="max-w-xs text-left text-xs leading-relaxed text-muted-foreground" role="status">
           {fallback}

@@ -162,7 +162,7 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
   });
 
-  it("does nothing when the installed student button is clicked", async () => {
+  it("shows a brief message when the installed student button is clicked", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", {
       configurable: true,
       value: vi.fn().mockResolvedValue([{ platform: "webapp", id: `${window.location.origin}/?hungry_app=student` }]),
@@ -170,6 +170,7 @@ describe("independent HUNGRY PWA install flows", () => {
     render(<HeroInstallButton app="student" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
+    expect(screen.getByRole("status")).toHaveTextContent("HUNGRY is already installed on your device.");
     expect(screen.queryByRole("heading", { name: "Already Installed" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start Ordering/ })).not.toBeInTheDocument();
   });
