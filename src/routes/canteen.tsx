@@ -98,8 +98,18 @@ function CanteenPage() {
     setState("auth");
   }
 
-  if (!backendConfigured) return <SetupNotice title="Canteen dashboard isn't connected yet" />;
-  if (state === "loading") return <div role="status" className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading…</div>;
+  if (!backendConfigured) return (
+    <div className="min-h-screen bg-background px-4 py-10">
+      <div className="mx-auto mb-6 flex justify-center"><HeroInstallButton app="canteen" /></div>
+      <SetupNotice title="Canteen dashboard isn't connected yet" />
+    </div>
+  );
+  if (state === "loading") return (
+    <div className="grid min-h-screen place-content-center justify-items-center gap-5 bg-background px-4 text-sm text-muted-foreground">
+      <div role="status">Loading…</div>
+      <HeroInstallButton app="canteen" />
+    </div>
+  );
   if (state === "ok" && canteen) return <Dashboard canteen={canteen} onSignOut={signOut} language={language} onLanguageChange={saveLanguage} />;
 
   return (
@@ -111,7 +121,7 @@ function CanteenPage() {
         ) : (
           <span className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY">HUNGRY</span>
         )}
-        {state === "auth" && <div className="mb-5 flex justify-center"><HeroInstallButton app="canteen" /></div>}
+        {state !== "ok" && <div className="mb-5 flex justify-center"><HeroInstallButton app="canteen" /></div>}
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">Canteen Dashboard</p>
           {state === "auth" ? (
