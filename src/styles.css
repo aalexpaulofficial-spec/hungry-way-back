@@ -329,31 +329,34 @@
 @layer components {
   .pwa-installed-overlay {
     position: fixed;
-    z-index: 120;
+    z-index: 10000;
     inset: 0;
     display: grid;
     place-items: center;
     padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom)));
     background: rgb(0 0 0 / 68%);
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(5px) saturate(85%);
   }
   .pwa-installed-dialog {
     box-sizing: border-box;
     position: relative;
     width: min(500px, calc(100vw - 48px));
     max-width: calc(100vw - 48px);
-    max-height: calc(100vh - 48px);
-    max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100vh - 96px);
+    max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - max(5rem, calc(4rem + env(safe-area-inset-bottom))));
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    border: 1px solid rgb(230 0 18 / 34%);
+    border: 1px solid rgb(230 0 18 / 52%);
     border-radius: 1.35rem;
-    background: linear-gradient(155deg, #151515 0%, #090909 58%, #101010 100%);
-    padding: 32px;
+    background: linear-gradient(155deg, rgb(25 25 25 / 97%) 0%, rgb(9 9 9 / 98%) 58%, rgb(17 17 17 / 97%) 100%);
+    background-clip: padding-box;
+    padding: 32px 32px 36px;
     color: #f7f7f7;
-    box-shadow: 0 22px 80px rgb(0 0 0 / 58%), 0 0 38px rgb(230 0 18 / 12%);
+    box-shadow: 0 26px 82px rgb(0 0 0 / 72%), 0 0 0 1px rgb(230 0 18 / 12%), 0 0 30px rgb(230 0 18 / 20%);
+    backdrop-filter: blur(16px) saturate(125%);
   }
   .pwa-installed-dialog,
   .pwa-installed-dialog * { box-sizing: border-box; }
@@ -407,22 +410,28 @@
   }
   .pwa-installed-secondary:hover { border-color: rgb(230 0 18 / 32%); background: #191919; color: #fff; }
   @media (min-width: 600px) and (max-width: 1024px) {
-    .pwa-installed-dialog { width: min(460px, calc(100vw - 48px)); padding: 26px; }
+    .pwa-installed-overlay { padding-bottom: max(4.5rem, calc(3.5rem + env(safe-area-inset-bottom))); }
+    .pwa-installed-dialog {
+      width: min(460px, calc(100vw - 48px));
+      max-height: calc(100vh - 88px);
+      max-height: calc(100dvh - max(1rem, env(safe-area-inset-top)) - max(4.5rem, calc(3.5rem + env(safe-area-inset-bottom))));
+      padding: 26px 26px 30px;
+    }
     .pwa-installed-logo-wrap { width: 72px; height: 72px; margin-bottom: 14px; }
     .pwa-installed-title { font-size: 1.45rem; }
     .pwa-installed-message { margin: 7px 0 16px; font-size: 0.92rem; line-height: 1.45; }
   }
   @media (max-width: 599px) {
     .pwa-installed-overlay {
-      padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom))) max(16px, env(safe-area-inset-left));
     }
     .pwa-installed-dialog {
       width: min(100%, calc(100vw - 32px));
       max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 36px);
-      max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+      max-height: calc(100vh - 100px);
+      max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom))));
       border-radius: 1.15rem;
-      padding: 19px;
+      padding: 19px 19px 24px;
     }
     .pwa-installed-logo-wrap { width: 64px; height: 64px; margin-bottom: 10px; }
     .pwa-installed-logo { font-size: 1.65rem; }

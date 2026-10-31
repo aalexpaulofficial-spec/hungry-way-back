@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { ArrowRight, X } from "lucide-react";
 import { LogoMark } from "@/components/foodexa/LogoMark";
 import type { HungryApp } from "@/lib/pwa-install";
@@ -28,7 +29,7 @@ export function AlreadyInstalledDialog({ app, onClose }: { app: HungryApp; onClo
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose]);
-  return (
+  return createPortal(
     <div className="pwa-installed-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section aria-modal="true" aria-labelledby="pwa-installed-title" className="pwa-installed-dialog" role="dialog">
         <button aria-label="Close dialog" className="pwa-installed-close" onClick={onClose} type="button"><X aria-hidden="true" className="h-5 w-5" /></button>
@@ -40,6 +41,7 @@ export function AlreadyInstalledDialog({ app, onClose }: { app: HungryApp; onClo
         <a className="pwa-installed-primary" href={copy.href}>{copy.action}<ArrowRight aria-hidden="true" className="h-5 w-5" /></a>
         <button className="pwa-installed-secondary" onClick={onClose} type="button">Close</button>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
