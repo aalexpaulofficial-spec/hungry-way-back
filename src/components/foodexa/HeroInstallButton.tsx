@@ -6,6 +6,7 @@ import {
   getInstallFallback,
   getPendingInstallApp,
   isAppInstalled,
+  requestInstallFromManifest,
   setPendingInstallApp,
   type HungryApp,
 } from "@/lib/pwa-install";
@@ -96,6 +97,28 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         setFallback(getInstallFallback(app));
       }
       return;
+    }
+
+    // Some Chromium versions expose Web Install's manifest-targeted API,
+    // allowing the canteen PWA to be installed directly from the landing page
+    // without borrowing the student page's beforeinstallprompt event.
+    if (app === "canteen") {
+      const installRequest = requestInstallFromManifest(app);
+      if (installRequest) {
+        setPendingInstallApp(app);
+        try {
+          await installRequest;
+          setPendingInstallApp(null);
+          setInstalled(true);
+          setFallback("");
+        } catch (error) {
+          setPendingInstallApp(null);
+          if (!(error instanceof DOMException && error.name === "AbortError")) {
+            setFallback(getInstallFallback(app));
+          }
+        }
+        return;
+      }
     }
 
     const confirmedInstalled = await isAppInstalled(app);

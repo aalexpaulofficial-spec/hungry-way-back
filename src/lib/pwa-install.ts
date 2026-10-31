@@ -8,6 +8,9 @@ type RelatedApp = { id?: string; url?: string; platform?: string };
 type NavigatorWithInstalledApps = Navigator & {
   getInstalledRelatedApps?: () => Promise<RelatedApp[]>;
 };
+type NavigatorWithWebInstall = Navigator & {
+  install?: (options: { manifest: string }) => Promise<unknown>;
+};
 
 const appIdentity: Record<HungryApp, { id: string; manifest: string }> = {
   student: { id: "/?hungry_app=student", manifest: "/manifest-student.webmanifest" },
@@ -40,6 +43,20 @@ if (typeof window !== "undefined") {
 export function getDeferredInstallPrompt(app?: HungryApp) {
   if (app) return deferredInstallPrompts.get(app) ?? null;
   return latestDeferredInstallApp ? deferredInstallPrompts.get(latestDeferredInstallApp) ?? null : null;
+}
+
+/**
+ * Chrome's experimental Web Install API can install a specific same-origin PWA
+ * from a page whose active manifest belongs to a different app. Keep this as a
+ * progressive enhancement; the established beforeinstallprompt flow remains
+ * the fallback on browsers that do not expose it.
+ */
+export function requestInstallFromManifest(app: HungryApp) {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return null;
+  const install = (navigator as NavigatorWithWebInstall).install;
+  if (typeof install !== "function") return null;
+  const manifest = new URL(appIdentity[app].manifest, window.location.origin).href;
+  return install.call(navigator, { manifest });
 }
 
 export function getPendingInstallApp() {

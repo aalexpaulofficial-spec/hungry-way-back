@@ -50,6 +50,7 @@ describe("independent HUNGRY PWA install flows", () => {
   afterEach(() => {
     cleanup();
     clearDeferredInstallPrompt();
+    Reflect.deleteProperty(navigator, "install");
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -207,6 +208,24 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(prompt).toHaveBeenCalledOnce();
     await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
+  });
+
+  it("uses a manifest-targeted native install from the landing button when supported", async () => {
+    Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
+    const install = vi.fn().mockResolvedValue({});
+    Object.defineProperty(navigator, "install", { configurable: true, value: install });
+    render(<HeroInstallButton app="canteen" />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(install).toHaveBeenCalledWith({
+      manifest: `${window.location.origin}/manifest-canteen.webmanifest`,
+    });
+    expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
+    expect(window.location.pathname).toBe("/");
   });
 
   it("shows the canteen popup and routes to the existing owner login page", async () => {
