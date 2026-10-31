@@ -6,7 +6,7 @@ const details = {
   student: {
     message: "HUNGRY is already installed on your device. You can launch it anytime from your home screen or desktop, or start ordering right now!",
     action: "Start Ordering",
-    href: "/app?hungry_app=student",
+    href: "/auth?hungry_app=student",
   },
   canteen: {
     message: "HUNGRY Canteen Dashboard is already installed on your device. You can launch it anytime from your home screen or desktop, or manage your canteen right now!",

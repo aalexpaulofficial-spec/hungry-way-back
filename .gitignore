@@ -34,3 +34,4 @@ dist-ssr
 # Local secret files (never commit server secrets)
 .env.local
 .env.*.local
+.vercel/

@@ -17,6 +17,7 @@ import { SetupNotice } from "@/components/SetupNotice";
 import { CanteenOwnerLoginForm } from "@/components/foodexa/CanteenOwnerLoginForm";
 import { LanguageSelect, localizeDashboard, useDashboardLanguage } from "@/lib/dashboard-language";
 import { isStandaloneApp } from "@/lib/pwa-install";
+import { HeroInstallButton } from "@/components/foodexa/HeroInstallButton";
 
 export const Route = createFileRoute("/canteen")({
   ssr: false,
@@ -110,6 +111,7 @@ function CanteenPage() {
         ) : (
           <span className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY">HUNGRY</span>
         )}
+        {state === "auth" && <div className="mb-5 flex justify-center"><HeroInstallButton app="canteen" /></div>}
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">Canteen Dashboard</p>
           {state === "auth" ? (
