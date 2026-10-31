@@ -1,7 +1,7 @@
 {
   "id": "/?hungry_app=canteen",
-  "name": "HUNGRY CANTEEN DASHBOARD",
-  "short_name": "HUNGRY CANTEEN",
+  "name": "Hungry - Canteen Dashboard",
+  "short_name": "Hungry - Canteen Dashboard",
   "description": "Register and manage your HUNGRY campus canteen.",
   "start_url": "/canteen?hungry_app=canteen",
   "scope": "/",

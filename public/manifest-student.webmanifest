@@ -1,7 +1,7 @@
 {
   "id": "/?hungry_app=student",
-  "name": "HUNGRY",
-  "short_name": "HUNGRY",
+  "name": "Hungry - Food Order",
+  "short_name": "Hungry - Food Order",
   "description": "Order campus food as a student, faculty member, or guest.",
   "start_url": "/auth?hungry_app=student",
   "scope": "/",
