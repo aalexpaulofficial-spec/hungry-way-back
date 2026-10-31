@@ -99,6 +99,20 @@ describe("independent HUNGRY PWA install flows", () => {
     unsubscribe();
   });
 
+  it("adopts a prompt captured by the pre-hydration listener", () => {
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
+    }) as InstallPromptEvent;
+    const installWindow = window as Window & {
+      __hungryPwaInstallState?: { prompts?: Partial<Record<"student" | "canteen", InstallPromptEvent>> };
+    };
+    installWindow.__hungryPwaInstallState = { prompts: { student: event } };
+    window.dispatchEvent(new CustomEvent("hungry-pwa-install-prompt", { detail: { app: "student" } }));
+    expect(getDeferredInstallPrompt("student")).toBe(event);
+    delete installWindow.__hungryPwaInstallState;
+  });
+
   it("retains the canteen prompt independently when its manifest is active", () => {
     setManifest("canteen");
     const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
@@ -166,7 +180,7 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
   });
 
-  it("does not reuse the student prompt for the canteen app from the landing manifest", async () => {
+  it("does not reuse the student prompt or navigate to an owner session page for Canteen", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
     const prompt = vi.fn().mockResolvedValue(undefined);
     window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
@@ -185,7 +199,8 @@ describe("independent HUNGRY PWA install flows", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     if (originalLocationDescriptor) Object.defineProperty(window, "location", originalLocationDescriptor);
     expect(prompt).not.toHaveBeenCalled();
-    expect(assign).toHaveBeenCalledWith("/canteen?hungry_app=canteen");
+    expect(assign).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("cannot install a second PWA directly");
   });
 
   it("directly prompts for the Canteen Dashboard on its own manifest route", async () => {

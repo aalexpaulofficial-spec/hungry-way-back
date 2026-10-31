@@ -11,6 +11,12 @@ type NavigatorWithInstalledApps = Navigator & {
 type NavigatorWithWebInstall = Navigator & {
   install?: (options: { manifest: string }) => Promise<unknown>;
 };
+type PwaInstallWindow = Window & {
+  __hungryPwaInstallState?: {
+    captureInstalled?: boolean;
+    prompts?: Partial<Record<HungryApp, InstallPromptEvent>>;
+  };
+};
 
 const appIdentity: Record<HungryApp, { id: string; manifest: string }> = {
   student: { id: "/?hungry_app=student", manifest: "/manifest-student.webmanifest" },
@@ -30,14 +36,36 @@ function getPageManifestApp(): HungryApp | null {
 }
 
 if (typeof window !== "undefined") {
+  const earlyPrompts = (window as PwaInstallWindow).__hungryPwaInstallState?.prompts;
+  if (earlyPrompts) {
+    for (const app of ["student", "canteen"] as const) {
+      const prompt = earlyPrompts[app];
+      if (prompt) {
+        deferredInstallPrompts.set(app, prompt);
+        latestDeferredInstallApp = app;
+      }
+    }
+  }
+
   window.addEventListener("beforeinstallprompt", (event) => {
     const app = getPageManifestApp();
     if (!app) return;
     event.preventDefault();
+    if (deferredInstallPrompts.get(app) === event) return;
     deferredInstallPrompts.set(app, event as InstallPromptEvent);
+    const earlyState = (window as PwaInstallWindow).__hungryPwaInstallState;
+    if (earlyState?.prompts) earlyState.prompts[app] = event as InstallPromptEvent;
     latestDeferredInstallApp = app;
     installPromptSubscribers.forEach((subscriber) => subscriber());
   });
+
+  window.addEventListener("hungry-pwa-install-prompt", ((event: CustomEvent<{ app: HungryApp }>) => {
+    const prompt = (window as PwaInstallWindow).__hungryPwaInstallState?.prompts?.[event.detail.app];
+    if (!prompt) return;
+    deferredInstallPrompts.set(event.detail.app, prompt);
+    latestDeferredInstallApp = event.detail.app;
+    installPromptSubscribers.forEach((subscriber) => subscriber());
+  }) as EventListener);
 }
 
 export function getDeferredInstallPrompt(app?: HungryApp) {
@@ -72,17 +100,37 @@ export function subscribeToInstallPrompt(subscriber: () => void) {
   return () => installPromptSubscribers.delete(subscriber);
 }
 
-export function clearDeferredInstallPrompt(prompt?: InstallPromptEvent) {
+export function clearDeferredInstallPrompt(prompt?: InstallPromptEvent, app?: HungryApp) {
   if (prompt) {
     for (const [app, deferredPrompt] of deferredInstallPrompts) {
       if (deferredPrompt === prompt) deferredInstallPrompts.delete(app);
     }
+    const prompts = typeof window !== "undefined" ? (window as PwaInstallWindow).__hungryPwaInstallState?.prompts : undefined;
+    if (prompts) {
+      for (const name of ["student", "canteen"] as const) {
+        if (prompts[name] === prompt) delete prompts[name];
+      }
+    }
     if (latestDeferredInstallApp && !deferredInstallPrompts.has(latestDeferredInstallApp)) {
       latestDeferredInstallApp = null;
+    }
+  } else if (app) {
+    deferredInstallPrompts.delete(app);
+    const prompts = typeof window !== "undefined" ? (window as PwaInstallWindow).__hungryPwaInstallState?.prompts : undefined;
+    if (prompts) delete prompts[app];
+    if (latestDeferredInstallApp === app) {
+      latestDeferredInstallApp = deferredInstallPrompts.size
+        ? [...deferredInstallPrompts.keys()].at(-1) ?? null
+        : null;
     }
   } else {
     deferredInstallPrompts.clear();
     latestDeferredInstallApp = null;
+    const prompts = typeof window !== "undefined" ? (window as PwaInstallWindow).__hungryPwaInstallState?.prompts : undefined;
+    if (prompts) {
+      delete prompts.student;
+      delete prompts.canteen;
+    }
   }
   installPromptSubscribers.forEach((subscriber) => subscriber());
 }
@@ -125,7 +173,7 @@ export function getInstallFallback(app: HungryApp) {
     return `In Safari, tap Share, then Add to Home Screen. ${appName} will show as installed after it opens from your Home Screen.`;
   }
   if (app === "canteen" && typeof document !== "undefined" && getPageManifestApp() !== "canteen") {
-    return "Open the existing Canteen Owner Login page to install the dashboard.";
+    return "This Chrome version cannot install a second PWA directly from this page. The dashboard has not been installed.";
   }
   if (/android/i.test(ua)) {
     return app === "canteen"

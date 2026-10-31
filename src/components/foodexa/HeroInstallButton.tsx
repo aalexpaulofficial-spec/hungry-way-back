@@ -46,7 +46,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     const onAppInstalled = () => {
       if (getPendingInstallApp() !== app) return;
       setPendingInstallApp(null);
-      clearDeferredInstallPrompt();
+      clearDeferredInstallPrompt(undefined, app);
       setInstalled(true);
       setFallback("");
     };
@@ -126,17 +126,6 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       setInstalled(true);
       setShowInstalledDialog(true);
       return;
-    }
-
-    // A document can expose only one PWA manifest to Chrome. The landing page
-    // belongs to the student app, so hand the canteen action to its existing
-    // owner-login route, which declares the canteen manifest and owns its prompt.
-    if (app === "canteen") {
-      const manifestHref = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')?.href ?? "";
-      if (!manifestHref.includes("manifest-canteen.webmanifest")) {
-        window.location.assign("/canteen?hungry_app=canteen");
-        return;
-      }
     }
 
     setFallback(getInstallFallback(app));

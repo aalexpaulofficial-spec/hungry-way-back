@@ -118,6 +118,8 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Capture Chrome's one-shot install event before the hydrated app bundle loads. */}
+        <script src="/pwa-install-capture.js" />
       </head>
       <body>
         {children}
