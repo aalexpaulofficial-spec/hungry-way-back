@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
-import { ArrowRight, Download, X } from "lucide-react";
+import { useEffect, useState, type MouseEvent } from "react";
+import { ArrowRight, Download } from "lucide-react";
 import {
   clearDeferredInstallPrompt,
   getDeferredInstallPrompt,
@@ -28,24 +28,8 @@ const copy = {
 export function HeroInstallButton({ app }: { app: HungryApp }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
-  const launchAttempted = useRef(false);
   const [fallback, setFallback] = useState("");
   const label = copy[app];
-
-  useEffect(() => {
-    if (!showInstalledDialog || app !== "student") return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShowInstalledDialog(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [app, showInstalledDialog]);
-
-  const launchStudentEntry = useCallback(() => {
-    if (app !== "student" || launchAttempted.current) return;
-    launchAttempted.current = true;
-    window.location.assign("/auth?hungry_app=student");
-  }, [app]);
 
   useEffect(() => {
     let active = true;
@@ -72,7 +56,6 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       clearDeferredInstallPrompt(undefined, app);
       setInstalled(true);
       setFallback("");
-      launchStudentEntry();
     };
     updateInstalled();
     window.addEventListener("pageshow", updateInstalled);
@@ -86,7 +69,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       window.removeEventListener("appinstalled", onAppInstalled);
       document.removeEventListener("visibilitychange", updateWhenVisible);
     };
-  }, [app, launchStudentEntry]);
+  }, [app]);
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -95,10 +78,9 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       return;
     }
     setFallback("");
-    if (app === "student") launchAttempted.current = false;
 
     if (installed) {
-      if (app === "canteen") setShowInstalledDialog(true);
+      setShowInstalledDialog(true);
       return;
     }
 
@@ -119,7 +101,6 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         if (confirmed) {
           setPendingInstallApp(null);
           setInstalled(true);
-          launchStudentEntry();
         }
       } catch {
         setPendingInstallApp(null);
@@ -172,32 +153,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         {installed ? <ArrowRight aria-hidden="true" className="h-4 w-4" /> : <Download aria-hidden="true" className="h-4 w-4" />}
         {installed ? "Already Installed" : label.download}
       </button>
-      {app === "student" && showInstalledDialog && (
-        <div
-          className="fixed inset-0 z-[100] grid place-items-center bg-black/65 p-4 backdrop-blur-sm"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setShowInstalledDialog(false);
-          }}
-        >
-          <section
-            className="relative w-full max-w-sm rounded-2xl border border-primary/35 bg-[#0b0b0b] px-6 py-6 pr-12 text-foreground shadow-[0_16px_60px_-18px_rgba(230,0,18,0.4)]"
-            role="dialog"
-            aria-modal="true"
-            aria-label="HUNGRY installation status"
-          >
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={() => setShowInstalledDialog(false)}
-              className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <X aria-hidden="true" className="h-4 w-4" />
-            </button>
-            <p className="text-sm font-medium leading-relaxed">HUNGRY is already installed on your device.</p>
-          </section>
-        </div>
-      )}
+
       {app === "canteen" && fallback && (
         <p className="max-w-xs text-left text-xs leading-relaxed text-muted-foreground" role="status">
           {fallback}
@@ -206,7 +162,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
           )}
         </p>
       )}
-      {app === "canteen" && showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
+      {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
     </div>
   );
 }

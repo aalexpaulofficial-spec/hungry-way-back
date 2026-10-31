@@ -158,20 +158,12 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(prompt).toHaveBeenCalledOnce();
     expect(window.location.pathname).toBe("/");
     expect(screen.getByRole("button", { name: "Download HUNGRY for Students, Faculty and Guests" })).toBeInTheDocument();
-    const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location");
-    const currentLocation = window.location;
-    const assign = vi.fn();
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      get: () => ({ origin: currentLocation.origin, pathname: currentLocation.pathname, search: currentLocation.search, assign }),
-    });
     await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
-    expect(assign).toHaveBeenCalledWith("/auth?hungry_app=student");
-    if (originalLocationDescriptor) Object.defineProperty(window, "location", originalLocationDescriptor);
+    expect(window.location.pathname).toBe("/");
   });
 
-  it("shows the compact HUNGRY message when the installed student button is clicked", async () => {
+  it("shows the existing HUNGRY installed popup and login destination", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", {
       configurable: true,
       value: vi.fn().mockResolvedValue([{ platform: "webapp", id: `${window.location.origin}/?hungry_app=student` }]),
@@ -179,10 +171,11 @@ describe("independent HUNGRY PWA install flows", () => {
     render(<HeroInstallButton app="student" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
-    expect(screen.getByRole("dialog", { name: "HUNGRY installation status" })).toHaveTextContent("HUNGRY is already installed on your device.");
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Already Installed" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "HUNGRY" })).toBeInTheDocument();
+    expect(screen.getByText("HUNGRY is already installed on your device. You can launch it anytime from your home screen or desktop, or start ordering right now!")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Start Ordering/ })).toHaveAttribute("href", "/auth?hungry_app=student");
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Start Ordering/ })).not.toBeInTheDocument();
   });
 
   it("keeps the separate canteen download action as a button", () => {
