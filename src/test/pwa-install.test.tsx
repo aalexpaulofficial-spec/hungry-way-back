@@ -158,11 +158,20 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(prompt).toHaveBeenCalledOnce();
     expect(window.location.pathname).toBe("/");
     expect(screen.getByRole("button", { name: "Download HUNGRY for Students, Faculty and Guests" })).toBeInTheDocument();
+    const originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, "location");
+    const currentLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      get: () => ({ origin: currentLocation.origin, pathname: currentLocation.pathname, search: currentLocation.search, assign }),
+    });
     await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
+    expect(assign).toHaveBeenCalledWith("/auth?hungry_app=student");
+    if (originalLocationDescriptor) Object.defineProperty(window, "location", originalLocationDescriptor);
   });
 
-  it("shows a brief message when the installed student button is clicked", async () => {
+  it("shows the compact HUNGRY message when the installed student button is clicked", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", {
       configurable: true,
       value: vi.fn().mockResolvedValue([{ platform: "webapp", id: `${window.location.origin}/?hungry_app=student` }]),
@@ -170,8 +179,9 @@ describe("independent HUNGRY PWA install flows", () => {
     render(<HeroInstallButton app="student" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
-    expect(screen.getByRole("status")).toHaveTextContent("HUNGRY is already installed on your device.");
-    expect(screen.queryByRole("heading", { name: "Already Installed" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "HUNGRY installation status" })).toHaveTextContent("HUNGRY is already installed on your device.");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start Ordering/ })).not.toBeInTheDocument();
   });
 
