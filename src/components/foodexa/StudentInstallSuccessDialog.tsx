@@ -47,9 +47,13 @@ export function StudentInstallSuccessDialog({ onClose }: { onClose: () => void }
         <p className="pwa-installed-message">
           HUNGRY has been successfully installed on your device. You can now access your food ordering app from your home screen.
         </p>
-        <a className="pwa-installed-primary" href="/auth?hungry_app=student">
-          Start Ordering<ArrowRight aria-hidden="true" className="h-5 w-5" />
-        </a>
+        <button
+          className="pwa-installed-primary border-0 font-[inherit] cursor-default disabled:opacity-100"
+          disabled
+          type="button"
+        >
+          Start Ordering in App<ArrowRight aria-hidden="true" className="h-5 w-5" />
+        </button>
       </section>
     </div>,
     document.body,
