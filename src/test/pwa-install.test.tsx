@@ -60,7 +60,7 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(studentManifest.name).toBe("Hungry");
     expect(studentManifest.start_url).toBe("/auth?hungry_app=student");
     expect(canteenManifest.name).toBe("Hungry - Canteen Dashboard");
-    expect(canteenManifest.start_url).toBe("/canteen?hungry_app=canteen");
+    expect(canteenManifest.start_url).toBe("/register-canteen?hungry_app=canteen");
     expect(studentManifest.scope).toBe("/");
     expect(canteenManifest.scope).toBe("/");
     expect(studentManifest.icons.map((icon) => icon.src)).toEqual(canteenManifest.icons.map((icon) => icon.src));
@@ -256,6 +256,6 @@ describe("independent HUNGRY PWA install flows", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
     expect(screen.getByRole("heading", { name: "Already Installed" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Open Canteen Dashboard/ })).toHaveAttribute("href", "/canteen?hungry_app=canteen");
+    expect(screen.getByRole("link", { name: /Open Canteen Dashboard/ })).toHaveAttribute("href", "/register-canteen?hungry_app=canteen");
   });
 });

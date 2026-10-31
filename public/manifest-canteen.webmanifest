@@ -3,7 +3,7 @@
   "name": "Hungry - Canteen Dashboard",
   "short_name": "Hungry - Canteen Dashboard",
   "description": "Register and manage your HUNGRY campus canteen.",
-  "start_url": "/canteen?hungry_app=canteen",
+  "start_url": "/register-canteen?hungry_app=canteen",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],

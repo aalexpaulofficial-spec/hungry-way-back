@@ -13,7 +13,7 @@ const details = {
   canteen: {
     message: "HUNGRY Canteen Dashboard is already installed on your device. You can launch it anytime from your home screen or desktop, or manage your canteen right now!",
     action: "Open Canteen Dashboard",
-    href: "/canteen?hungry_app=canteen",
+    href: "/register-canteen?hungry_app=canteen",
   },
 } satisfies Record<HungryApp, { message: string; action: string; href: string }>;
 

@@ -16,6 +16,7 @@ const description =
 
 export const Route = createFileRoute("/register-canteen")({
   head: () => ({
+    links: [{ rel: "manifest", href: "/manifest-canteen.webmanifest" }],
     meta: [
       { title },
       { name: "description", content: description },
