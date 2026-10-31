@@ -77,12 +77,12 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (dedicatedInstallPage && app === "student") {
-      window.location.assign("/install-hungry");
-      return;
-    }
     if (app === "canteen") {
       if (installed) return;
+      if (dedicatedInstallPage) {
+        window.location.assign("/install/canteen");
+        return;
+      }
       setInstallationNotice("");
       void handleLandingCanteenInstall();
       return;

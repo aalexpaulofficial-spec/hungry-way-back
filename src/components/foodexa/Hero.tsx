@@ -133,7 +133,7 @@ export function Hero() {
                   ↗
                 </span>
               </a>
-              <HeroInstallButton app="student" dedicatedInstallPage />
+              <HeroInstallButton app="student" />
               <HeroInstallButton app="canteen" dedicatedInstallPage />
             </div>
             <a
