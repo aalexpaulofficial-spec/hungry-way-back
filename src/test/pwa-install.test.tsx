@@ -162,7 +162,7 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
   });
 
-  it("shows the user popup and routes Start Ordering to the existing login page", async () => {
+  it("does nothing when the installed student button is clicked", async () => {
     Object.defineProperty(navigator, "getInstalledRelatedApps", {
       configurable: true,
       value: vi.fn().mockResolvedValue([{ platform: "webapp", id: `${window.location.origin}/?hungry_app=student` }]),
@@ -170,8 +170,8 @@ describe("independent HUNGRY PWA install flows", () => {
     render(<HeroInstallButton app="student" />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
-    expect(screen.getByRole("heading", { name: "Already Installed" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Start Ordering/ })).toHaveAttribute("href", "/auth?hungry_app=student");
+    expect(screen.queryByRole("heading", { name: "Already Installed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Start Ordering/ })).not.toBeInTheDocument();
   });
 
   it("keeps the separate canteen download action as a button", () => {

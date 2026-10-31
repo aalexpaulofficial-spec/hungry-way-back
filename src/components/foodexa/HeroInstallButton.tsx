@@ -36,7 +36,14 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     const updateInstalled = () => {
       void isAppInstalled(app).then((result) => {
         if (!active) return;
-        setInstalled(result);
+        if (result) {
+          setInstalled(true);
+        } else if (
+          app !== "student" ||
+          typeof (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps === "function"
+        ) {
+          setInstalled(false);
+        }
         if (result && getPendingInstallApp() === app) setPendingInstallApp(null);
       });
     };
@@ -66,10 +73,11 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
+    if (app === "student" && installed) return;
     setFallback("");
 
     if (installed) {
-      setShowInstalledDialog(true);
+      if (app === "canteen") setShowInstalledDialog(true);
       return;
     }
 
@@ -94,7 +102,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
       } catch {
         setPendingInstallApp(null);
         clearDeferredInstallPrompt(promptEvent);
-        setFallback(getInstallFallback(app));
+        if (app === "canteen") setFallback(getInstallFallback(app));
       }
       return;
     }
@@ -114,7 +122,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         } catch (error) {
           setPendingInstallApp(null);
           if (!(error instanceof DOMException && error.name === "AbortError")) {
-            setFallback(getInstallFallback(app));
+            if (app === "canteen") setFallback(getInstallFallback(app));
           }
         }
         return;
@@ -124,11 +132,11 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
     const confirmedInstalled = await isAppInstalled(app);
     if (confirmedInstalled) {
       setInstalled(true);
-      setShowInstalledDialog(true);
+      if (app === "canteen") setShowInstalledDialog(true);
       return;
     }
 
-    setFallback(getInstallFallback(app));
+    if (app === "canteen") setFallback(getInstallFallback(app));
   }
 
   return (
@@ -142,7 +150,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
         {installed ? <ArrowRight aria-hidden="true" className="h-4 w-4" /> : <Download aria-hidden="true" className="h-4 w-4" />}
         {installed ? "Already Installed" : label.download}
       </button>
-      {fallback && (
+      {app === "canteen" && fallback && (
         <p className="max-w-xs text-left text-xs leading-relaxed text-muted-foreground" role="status">
           {fallback}
           {app === "canteen" && fallback.includes("owner login page") && (
@@ -150,7 +158,7 @@ export function HeroInstallButton({ app }: { app: HungryApp }) {
           )}
         </p>
       )}
-      {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
+      {app === "canteen" && showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
     </div>
   );
 }
