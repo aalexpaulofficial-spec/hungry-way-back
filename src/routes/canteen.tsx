@@ -121,7 +121,7 @@ function CanteenPage() {
         ) : (
           <span className="mb-8 block text-center display text-[15px] tracking-[0.3em]" aria-label="HUNGRY">HUNGRY</span>
         )}
-        {state !== "ok" && <div className="mb-5 flex justify-center"><HeroInstallButton app="canteen" /></div>}
+        {state !== "ok" && state !== "error" && <div className="mb-5 flex justify-center"><HeroInstallButton app="canteen" /></div>}
         <div className="glass-red anim-rise rounded-[2rem] p-6 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary-bright">Canteen Dashboard</p>
           {state === "auth" ? (
@@ -150,6 +150,7 @@ function CanteenPage() {
             <div className="mt-4 space-y-4">
               <h1 className="display text-2xl">Could not load your dashboard</h1>
               <p role="alert" className="text-sm text-primary-bright">{err}</p>
+              <div className="pt-1"><HeroInstallButton app="canteen" /></div>
               <button type="button" onClick={() => void resolve()} className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground">Try again</button>
               <button type="button" onClick={signOut} className="w-full rounded-full border border-border py-3 text-sm text-muted-foreground hover:text-foreground">Sign out</button>
             </div>
