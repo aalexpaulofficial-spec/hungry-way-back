@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ArrowRight, Download } from "lucide-react";
 import {
   clearDeferredInstallPrompt,
+  getInstallFallback,
   getDeferredInstallPrompt,
   getPendingInstallApp,
   isAppInstalled,
@@ -11,8 +12,6 @@ import {
   type HungryApp,
 } from "@/lib/pwa-install";
 import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
-import { CanteenInstallDialog } from "@/components/foodexa/CanteenInstallDialog";
-import { StudentInstallSuccessDialog } from "@/components/foodexa/StudentInstallSuccessDialog";
 
 const copy = {
   student: {
@@ -28,70 +27,10 @@ const copy = {
 export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: HungryApp; dedicatedInstallPage?: boolean }) {
   const [installed, setInstalled] = useState(false);
   const [showInstalledDialog, setShowInstalledDialog] = useState(false);
-  const [showStudentInstallSuccess, setShowStudentInstallSuccess] = useState(false);
-  const [canteenDialog, setCanteenDialog] = useState<"confirm" | "success" | null>(null);
-  const [canteenInstallReady, setCanteenInstallReady] = useState(false);
-  const [canteenInstallStatus, setCanteenInstallStatus] = useState<"waiting" | "unavailable" | "cancelled" | null>(null);
-  const canteenInstallRequested = useRef(false);
-  const studentInstallRequested = useRef(false);
+  const [installationNotice, setInstallationNotice] = useState("");
   const installCheckRevision = useRef(0);
   const label = copy[app];
 
-  useEffect(() => {
-    if (app !== "canteen" || canteenDialog !== "confirm") return;
-
-    let manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    let createdManifestLink = false;
-    if (!manifestLink) {
-      manifestLink = document.createElement("link");
-      manifestLink.rel = "manifest";
-      document.head.append(manifestLink);
-      createdManifestLink = true;
-    }
-
-    const previousManifest = manifestLink.href;
-    const canteenManifest = new URL("/manifest-canteen.webmanifest", window.location.origin).href;
-    let timeout: number | undefined;
-    const updatePromptAvailability = () => {
-      const promptReady = Boolean(
-        getDeferredInstallPrompt("canteen") ||
-        typeof (navigator as Navigator & { install?: unknown }).install === "function",
-      );
-      setCanteenInstallReady(promptReady);
-      if (promptReady) {
-        if (timeout !== undefined) window.clearTimeout(timeout);
-        setCanteenInstallStatus(null);
-      } else {
-        setCanteenInstallStatus((current) =>
-          current === "cancelled" || current === "unavailable" ? current : "waiting",
-        );
-      }
-    };
-
-    const unsubscribe = subscribeToInstallPrompt(updatePromptAvailability);
-    if (manifestLink.href !== canteenManifest) manifestLink.href = canteenManifest;
-    updatePromptAvailability();
-    if (!getDeferredInstallPrompt("canteen") && typeof (navigator as Navigator & { install?: unknown }).install !== "function") {
-      timeout = window.setTimeout(() => {
-        const promptReady = Boolean(
-          getDeferredInstallPrompt("canteen") ||
-          typeof (navigator as Navigator & { install?: unknown }).install === "function",
-        );
-        setCanteenInstallReady(promptReady);
-        setCanteenInstallStatus(promptReady ? null : "unavailable");
-      }, 4000);
-    }
-
-    return () => {
-      unsubscribe();
-      if (timeout !== undefined) window.clearTimeout(timeout);
-      if (createdManifestLink) {
-        manifestLink?.remove();
-      } else if (manifestLink?.href === canteenManifest && previousManifest && previousManifest !== canteenManifest) {
-        manifestLink.href = previousManifest;
-      }
-    };
-  }, [app, canteenDialog]);
   useEffect(() => {
     let active = true;
     const updateInstalled = () => {
@@ -100,11 +39,6 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
         if (!active || revision !== installCheckRevision.current) return;
         if (result) {
           setInstalled(true);
-          if (app === "canteen") {
-            setCanteenInstallReady(false);
-            setCanteenInstallStatus(null);
-            setCanteenDialog((current) => current === "confirm" ? null : current);
-          }
         } else if (
           app !== "student" ||
           typeof (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps === "function"
@@ -113,10 +47,6 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
         }
         if (result && getPendingInstallApp() === app) {
           setPendingInstallApp(null);
-          if (app === "canteen" && canteenInstallRequested.current) {
-            canteenInstallRequested.current = false;
-            setCanteenDialog("success");
-          }
         }
       });
     };
@@ -129,15 +59,7 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
       setPendingInstallApp(null);
       clearDeferredInstallPrompt(undefined, app);
       setInstalled(true);
-      if (app === "canteen" && canteenInstallRequested.current) {
-        canteenInstallRequested.current = false;
-        setCanteenInstallReady(false);
-        setCanteenInstallStatus(null);
-        setCanteenDialog("success");
-      } else if (app === "student" && studentInstallRequested.current) {
-        studentInstallRequested.current = false;
-        setShowStudentInstallSuccess(true);
-      }
+      setInstallationNotice("");
     };
     updateInstalled();
     window.addEventListener("pageshow", updateInstalled);
@@ -155,24 +77,14 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
 
   async function handleDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    if (dedicatedInstallPage) {
-      window.location.assign(app === "student" ? "/install-hungry" : "/install-canteen");
+    if (dedicatedInstallPage && app === "student") {
+      window.location.assign("/install-hungry");
       return;
     }
     if (app === "canteen") {
-      if (!installed && await isAppInstalled("canteen")) {
-        setInstalled(true);
-        setCanteenError("");
-        setShowInstalledDialog(true);
-        return;
-      }
-      if (installed) {
-        setShowInstalledDialog(true);
-        return;
-      }
-      setCanteenInstallReady(false);
-      setCanteenInstallStatus(null);
-      setCanteenDialog("confirm");
+      if (installed) return;
+      setInstallationNotice("");
+      void handleLandingCanteenInstall();
       return;
     }
 
@@ -185,90 +97,68 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
     if (!promptEvent) return;
 
     setPendingInstallApp("student");
-    studentInstallRequested.current = true;
     try {
       const promptResult = promptEvent.prompt();
       const choice = await promptEvent.userChoice;
       clearDeferredInstallPrompt(promptEvent);
       if (choice.outcome === "dismissed") {
         setPendingInstallApp(null);
-        studentInstallRequested.current = false;
         return;
       }
       await promptResult;
       if (await isAppInstalled("student")) {
         setPendingInstallApp(null);
         setInstalled(true);
-        if (studentInstallRequested.current) {
-          studentInstallRequested.current = false;
-          setShowStudentInstallSuccess(true);
-        }
       }
     } catch {
       setPendingInstallApp(null);
-      studentInstallRequested.current = false;
       clearDeferredInstallPrompt(promptEvent);
     }
   }
 
-  async function handleCanteenContinue() {
+  async function handleLandingCanteenInstall() {
     const promptEvent = getDeferredInstallPrompt("canteen");
     const installRequest = promptEvent ? null : requestInstallFromManifest("canteen");
+
     if (!promptEvent && !installRequest) {
-      setCanteenInstallReady(false);
-      setCanteenInstallStatus("unavailable");
+      setInstallationNotice(getInstallFallback("canteen"));
       return;
     }
-    setCanteenInstallStatus(null);
 
     setPendingInstallApp("canteen");
-    canteenInstallRequested.current = true;
-
     if (promptEvent) {
       try {
         const promptResult = promptEvent.prompt();
-        setCanteenDialog(null);
         const choice = await promptEvent.userChoice;
-        clearDeferredInstallPrompt(promptEvent);
+        clearDeferredInstallPrompt(promptEvent, "canteen");
         if (choice.outcome === "dismissed") {
           setPendingInstallApp(null);
-          canteenInstallRequested.current = false;
-          setCanteenInstallReady(false);
-          setCanteenInstallStatus("cancelled");
-          setCanteenDialog("confirm");
           return;
         }
         await promptResult;
         if (await isAppInstalled("canteen")) {
           setPendingInstallApp(null);
-          canteenInstallRequested.current = false;
           setInstalled(true);
-          setCanteenDialog("success");
+          setInstallationNotice("");
         }
       } catch {
         setPendingInstallApp(null);
-        canteenInstallRequested.current = false;
-        clearDeferredInstallPrompt(promptEvent);
-        setCanteenInstallReady(false);
-        setCanteenInstallStatus("unavailable");
-        setCanteenDialog("confirm");
+        clearDeferredInstallPrompt(promptEvent, "canteen");
+        setInstallationNotice(getInstallFallback("canteen"));
       }
       return;
     }
 
-    setCanteenDialog(null);
     try {
       await installRequest;
-      setPendingInstallApp(null);
-      canteenInstallRequested.current = false;
-      setInstalled(true);
-      setCanteenDialog("success");
+      if (await isAppInstalled("canteen")) {
+        setPendingInstallApp(null);
+        setInstalled(true);
+        setInstallationNotice("");
+      }
     } catch {
       setPendingInstallApp(null);
-      canteenInstallRequested.current = false;
-      setCanteenInstallReady(false);
-      setCanteenInstallStatus("unavailable");
-      setCanteenDialog("confirm");
+      setInstallationNotice(getInstallFallback("canteen"));
     }
   }
 
@@ -284,21 +174,8 @@ export function HeroInstallButton({ app, dedicatedInstallPage = false }: { app: 
         {installed ? "Already Installed" : label.download}
       </button>
       {showInstalledDialog && <AlreadyInstalledDialog app={app} onClose={() => setShowInstalledDialog(false)} />}
-      {app === "student" && showStudentInstallSuccess && (
-        <StudentInstallSuccessDialog onClose={() => setShowStudentInstallSuccess(false)} />
-      )}
-      {app === "canteen" && canteenDialog && (
-        <CanteenInstallDialog
-          mode={canteenDialog}
-          onContinue={() => void handleCanteenContinue()}
-          onClose={() => {
-            setCanteenInstallReady(false);
-            setCanteenInstallStatus(null);
-            setCanteenDialog(null);
-          }}
-          installReady={canteenInstallReady}
-          status={canteenInstallStatus}
-        />
+      {app === "canteen" && installationNotice && !installed && (
+        <p role="status" className="max-w-64 text-xs leading-relaxed text-muted-foreground">{installationNotice}</p>
       )}
     </div>
   );

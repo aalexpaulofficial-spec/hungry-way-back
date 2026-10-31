@@ -14,7 +14,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CanteenRouteImport } from './routes/canteen'
-import { Route as InstallCanteenRouteImport } from './routes/install-canteen'
 import { Route as InstallHungryRouteImport } from './routes/install-hungry'
 import { Route as RegisterCanteenRouteImport } from './routes/register-canteen'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
@@ -44,11 +43,6 @@ const CanteenRoute = CanteenRouteImport.update({
   path: '/canteen',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InstallCanteenRoute = InstallCanteenRouteImport.update({
-  id: '/install-canteen',
-  path: '/install-canteen',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const InstallHungryRoute = InstallHungryRouteImport.update({
   id: '/install-hungry',
   path: '/install-hungry',
@@ -76,7 +70,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
-  '/install-canteen': typeof InstallCanteenRoute
   '/install-hungry': typeof InstallHungryRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/app': typeof AuthenticatedAppRoute
@@ -87,7 +80,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
-  '/install-canteen': typeof InstallCanteenRoute
   '/install-hungry': typeof InstallHungryRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/app': typeof AuthenticatedAppRoute
@@ -100,7 +92,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/canteen': typeof CanteenRoute
-  '/install-canteen': typeof InstallCanteenRoute
   '/install-hungry': typeof InstallHungryRoute
   '/register-canteen': typeof RegisterCanteenRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
@@ -113,7 +104,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
-    | '/install-canteen'
     | '/install-hungry'
     | '/register-canteen'
     | '/app'
@@ -124,7 +114,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
-    | '/install-canteen'
     | '/install-hungry'
     | '/register-canteen'
     | '/app'
@@ -136,7 +125,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/canteen'
-    | '/install-canteen'
     | '/install-hungry'
     | '/register-canteen'
     | '/_authenticated/app'
@@ -149,7 +137,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   CanteenRoute: typeof CanteenRoute
-  InstallCanteenRoute: typeof InstallCanteenRoute
   InstallHungryRoute: typeof InstallHungryRoute
   RegisterCanteenRoute: typeof RegisterCanteenRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
@@ -190,13 +177,6 @@ declare module '@tanstack/react-router' {
       path: '/canteen'
       fullPath: '/canteen'
       preLoaderRoute: typeof CanteenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/install-canteen': {
-      id: '/install-canteen'
-      path: '/install-canteen'
-      fullPath: '/install-canteen'
-      preLoaderRoute: typeof InstallCanteenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/install-hungry': {
@@ -247,7 +227,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   CanteenRoute: CanteenRoute,
-  InstallCanteenRoute: InstallCanteenRoute,
   InstallHungryRoute: InstallHungryRoute,
   RegisterCanteenRoute: RegisterCanteenRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,

@@ -174,7 +174,8 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.getByRole("heading", { name: "Already Installed" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "HUNGRY" })).toBeInTheDocument();
     expect(screen.getByText("HUNGRY is already installed on your device. You can launch it anytime from your home screen or desktop, or start ordering right now!")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Start Ordering/ })).toHaveAttribute("href", "/auth?hungry_app=student");
+    expect(screen.getByRole("button", { name: "Start Ordering in App" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: /Start Ordering/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
@@ -184,33 +185,7 @@ describe("independent HUNGRY PWA install flows", () => {
     expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument();
   });
 
-  it("enables the canteen download button only after its install prompt is ready", async () => {
-    Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
-    const prompt = vi.fn().mockResolvedValue(undefined);
-    render(<HeroInstallButton app="canteen" />);
-    fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-    expect(screen.getByRole("heading", { name: "Are You a Canteen Owner?" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Preparing your download");
-    expect(screen.getByRole("button", { name: /Continue to Download/ })).toBeDisabled();
-
-    await act(async () => {
-      window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
-        prompt,
-        userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
-      }));
-      await Promise.resolve();
-    });
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Continue to Download/ })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(prompt).toHaveBeenCalledOnce();
-    await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
-    expect(screen.getByRole("heading", { name: "Installation Successful!" })).toBeInTheDocument();
-  });
-
-  it("directly prompts for the Canteen Dashboard on its own manifest route", async () => {
-    window.history.replaceState({}, "", "/canteen?hungry_app=canteen");
+  it("directly prompts from the Canteen landing button and keeps installation state independent", async () => {
     setManifest("canteen");
     Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
     const prompt = vi.fn().mockResolvedValue(undefined);
@@ -219,42 +194,44 @@ describe("independent HUNGRY PWA install flows", () => {
       userChoice: Promise.resolve({ outcome: "accepted" as const, platform: "web" }),
     }) as InstallPromptEvent;
     window.dispatchEvent(event);
-    render(<HeroInstallButton app="canteen" />);
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    render(<HeroInstallButton app="canteen" dedicatedInstallPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
     expect(prompt).toHaveBeenCalledOnce();
-    await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
-    expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
-    expect(screen.getByRole("heading", { name: "Installation Successful!" })).toBeInTheDocument();
-  });
-
-  it("uses a manifest-targeted native install from the landing button when supported", async () => {
-    Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
-    const install = vi.fn().mockResolvedValue({});
-    Object.defineProperty(navigator, "install", { configurable: true, value: install });
-    render(<HeroInstallButton app="canteen" />);
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
-    fireEvent.click(screen.getByRole("button", { name: /Continue to Download/ }));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(install).toHaveBeenCalledWith({
-      manifest: `${window.location.origin}/manifest-canteen.webmanifest`,
-    });
-    expect(screen.getByRole("button", { name: "Already Installed" })).toHaveTextContent("Already Installed");
     expect(window.location.pathname).toBe("/");
+    expect(screen.queryByRole("heading", { name: "Installation Successful!" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Already Installed" })).not.toBeInTheDocument();
+
+    await act(async () => { window.dispatchEvent(new Event("appinstalled")); });
+    const installedButton = screen.getByRole("button", { name: "Already Installed" });
+    expect(installedButton).toHaveTextContent("Already Installed");
+    fireEvent.click(installedButton);
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("heading", { name: "Already Installed" })).not.toBeInTheDocument();
   });
 
-  it("shows the canteen popup and routes to the existing owner login page", async () => {
-    Object.defineProperty(navigator, "getInstalledRelatedApps", {
-      configurable: true,
-      value: vi.fn().mockResolvedValue([{ platform: "webapp", id: `${window.location.origin}/?hungry_app=canteen` }]),
+  it("keeps Canteen Download state after a cancelled install", async () => {
+    setManifest("canteen");
+    Object.defineProperty(navigator, "getInstalledRelatedApps", { configurable: true, value: vi.fn().mockResolvedValue([]) });
+    const prompt = vi.fn().mockResolvedValue(undefined);
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt,
+      userChoice: Promise.resolve({ outcome: "dismissed" as const, platform: "web" }),
+    }) as InstallPromptEvent;
+    window.dispatchEvent(event);
+    render(<HeroInstallButton app="canteen" dedicatedInstallPage />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" }));
+      await Promise.resolve();
+      await Promise.resolve();
     });
-    render(<HeroInstallButton app="canteen" />);
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    fireEvent.click(screen.getByRole("button", { name: "Already Installed" }));
-    expect(screen.getByRole("heading", { name: "Already Installed" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Open Canteen Dashboard/ })).toHaveAttribute("href", "/register-canteen?hungry_app=canteen");
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Download the Canteen Dashboard for Canteen Owners" })).toHaveTextContent("Download Canteen Dashboard");
   });
+
 });

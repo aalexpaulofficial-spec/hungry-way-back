@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowLeft, ArrowRight, BookOpen, Clock3, MapPin } from "lucide-react";
 import { AlreadyInstalledDialog } from "@/components/foodexa/AlreadyInstalledDialog";
-import { StudentInstallSuccessDialog } from "@/components/foodexa/StudentInstallSuccessDialog";
 import {
   clearDeferredInstallPrompt,
   getDeferredInstallPrompt,
@@ -29,9 +28,7 @@ function HungryInstallPage() {
   const [installed, setInstalled] = useState(false);
   const [promptReady, setPromptReady] = useState(false);
   const [status, setStatus] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
   const [showAlreadyInstalled, setShowAlreadyInstalled] = useState(false);
-  const installRequested = useRef(false);
   const checkRevision = useRef(0);
 
   useEffect(() => {
@@ -65,11 +62,9 @@ function HungryInstallPage() {
       checkRevision.current += 1;
       setPendingInstallApp(null);
       clearDeferredInstallPrompt(undefined, "student");
-      installRequested.current = false;
       setInstalled(true);
       setPromptReady(false);
       setStatus("");
-      setShowSuccess(true);
     };
 
     const unsubscribe = subscribeToInstallPrompt(updatePromptAvailability);
@@ -124,7 +119,6 @@ function HungryInstallPage() {
     setStatus("");
     setPromptReady(false);
     setPendingInstallApp("student");
-    installRequested.current = true;
 
     try {
       if (promptEvent) {
@@ -133,28 +127,24 @@ function HungryInstallPage() {
         clearDeferredInstallPrompt(promptEvent, "student");
         if (choice.outcome === "dismissed") {
           setPendingInstallApp(null);
-          installRequested.current = false;
           setStatus("Installation wasn't completed. Refresh this page when you're ready to try again.");
           return;
         }
         await promptResult;
         if (await isAppInstalled("student")) {
           setPendingInstallApp(null);
-          installRequested.current = false;
           setInstalled(true);
-          setShowSuccess(true);
         }
         return;
       }
 
       await installRequest;
-      setPendingInstallApp(null);
-      installRequested.current = false;
-      setInstalled(true);
-      setShowSuccess(true);
+      if (await isAppInstalled("student")) {
+        setPendingInstallApp(null);
+        setInstalled(true);
+      }
     } catch {
       setPendingInstallApp(null);
-      installRequested.current = false;
       if (promptEvent) clearDeferredInstallPrompt(promptEvent, "student");
       setStatus("Installation couldn't be completed. Please try again.");
     }
@@ -225,7 +215,6 @@ function HungryInstallPage() {
           </div>
         </section>
       </div>
-      {showSuccess && <StudentInstallSuccessDialog onClose={() => setShowSuccess(false)} />}
       {showAlreadyInstalled && <AlreadyInstalledDialog app="student" onClose={() => setShowAlreadyInstalled(false)} />}
     </main>
   );
